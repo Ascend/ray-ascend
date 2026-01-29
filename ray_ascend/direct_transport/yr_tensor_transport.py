@@ -11,11 +11,19 @@ from ray.experimental import (
     TensorTransportManager,
     TensorTransportMetadata,
 )
-from yr.datasystem import DsTensorClient
 
 if TYPE_CHECKING:
     import torch
 
+try:
+    from yr.datasystem import DsTensorClient
+    import torch
+    import torch_npu
+except ImportError as e:
+    raise ImportError(
+        "The 'yr_tensor_transport' feature requires yr optional dependencies. "
+        "Please install them with: pip install 'ray-ascend[yr]'"
+    ) from e
 
 @dataclass
 class YRCommunicatorMetadata(CommunicatorMetadata):

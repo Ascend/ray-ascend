@@ -1,0 +1,35 @@
+site_name: "ray-ascend document"
+site_description: "ray-ascend document — user guide and developer guide"
+site_author: "ray-ascend"
+
+docs_dir: .
+site_dir: ../site
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - Overview: user_guide/index.md
+      - Quickstart: user_guide/quickstart.md
+  - Developer Guide:
+      - Overview: developer_guide/index.md
+      - Setup: developer_guide/setup.md
+      - Contributing: developer_guide/contributing.md
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - footnotes
+  - pymdownx.superfences
+plugins:
+  - search
+  - pdf-export:
+      verbose: true
+      combined: true
+      output_path: pdf/guide.pdf
+extra:
+  repository_url: https://gitcode.com/Ascend/ray-ascend
