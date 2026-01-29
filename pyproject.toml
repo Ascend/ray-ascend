@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+requires = ["setuptools>=61.0", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,12 +7,9 @@ name = "ray-ascend"
 dynamic = ["version"]
 description = "Community maintained hardware plugin for Ray on Ascend"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = {file = "LICENSE"}
 authors = [
-    {name = "ray-ascend contributors"}
-]
-maintainers = [
     {name = "ray-ascend contributors"}
 ]
 keywords = ["ray", "ascend", "distributed computing", "machine learning"]
@@ -32,25 +29,26 @@ classifiers = [
     "Topic :: System :: Distributed Computing",
 ]
 
-dependencies = [
-    "ray>=2.50.0",
-]
+[tool.setuptools.dynamic]
+dependencies = {file = "requirements.txt"}
 
 [project.optional-dependencies]
-dev = [
+test = [
     "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black~=24.1.0",
-    "isort~=5.13.0",
-    "flake8~=7.0.0",
-    "mypy~=1.8.0",
-    "pre-commit>=3.0.0",
+    "pytest-asyncio>=0.20.0",  
+]
+
+yr = [
+    "openyuanrong-datasystem>=0.6.3",
+    "torch==2.7.1+cpu; platform_machine == 'x86_64'",
+    "torch==2.7.1; platform_machine == 'aarch64'",
+    "torch-npu==2.7.1.post1",
 ]
 
 [project.urls]
-Homepage = "https://github.com/tianyi-ge/ray-ascend"
-Repository = "https://github.com/tianyi-ge/ray-ascend"
-Issues = "https://github.com/tianyi-ge/ray-ascend/issues"
+Homepage = "https://gitcode.com/Ascend/ray-ascend"
+Repository = "https://gitcode.com/Ascend/ray-ascend"
+Issues = "https://gitcode.com/Ascend/ray-ascend/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -61,7 +59,7 @@ write_to = "ray_ascend/_version.py"
 
 [tool.black]
 line-length = 88
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+target-version = ['py39', 'py310', 'py311', 'py312']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
