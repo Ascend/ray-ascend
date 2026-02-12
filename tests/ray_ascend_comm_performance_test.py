@@ -3,23 +3,19 @@ import logging
 import os
 import shutil
 import subprocess
-import sys
 import time
-from pathlib import Path
+from typing import Optional
 
 import ray
 import torch
+from direct_transport.conftest import (
+    start_datasystem,
+    start_etcd,
+)
 from omegaconf import OmegaConf
 from ray.experimental import register_tensor_transport
 
 from ray_ascend.direct_transport import YRTensorTransport
-from ray_ascend.tests.direct_transport.conftest import (
-    start_datasystem,
-    start_etcd,
-)
-
-parent_dir = Path(__file__).resolve().parent.parent.parent
-sys.path.append(str(parent_dir))
 
 register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
 
@@ -61,7 +57,7 @@ def check_npu_is_available() -> None:
             )
 
 
-def yr_is_available_in_actor(actor: ray.ActorHandle) -> bool:
+def yr_is_available_in_actor(actor: "ray.actor.ActorHandle") -> bool:
     gpu_object_manager = ray._private.worker.global_worker.gpu_object_manager
     return bool(gpu_object_manager.actor_has_tensor_transport(actor, "YR"))
 
@@ -74,21 +70,40 @@ def compute_total_size(batch_size: int, seq_length: int) -> float:
     return total_size_gb
 
 
+# TODO: support more configurations (Currently only YR with NPU is supported) and config file parsing
 def parse_args() -> dict:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", type=str, help="Backend must be ['yr', 'hccl']")
     parser.add_argument(
-        "--placement", type=str, default="local", help="['local', 'remote']"
+        "--backend",
+        type=str,
+        choices=["yr", "hccl"],
+        required=True,
+        help="Backend must be ['yr', 'hccl']",
     )
     parser.add_argument(
-        "--transport", type=str, help="['tcp', 'rdma'] for yr or ['hccs'] for hccl"
+        "--placement",
+        type=str,
+        default="local",
+        choices=["local", "remote"],
+        help="['local', 'remote']",
     )
-    parser.add_argument("--device", type=str, default="cpu", help="['npu', 'cpu']")
+    parser.add_argument(
+        "--transport",
+        type=str,
+        choices=["tcp", "rdma", "hccs"],
+        help="['tcp', 'rdma'] for yr or ['hccs'] for hccl",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        choices=["npu", "cpu"],
+        help="['npu', 'cpu']",
+    )
     args = parser.parse_args()
     return vars(args)
 
 
-# Todo: use decorator to start etcd and ds
 def decorate_with_transport(transport_name):
     def decorator(cls):
         # Class decorator: start a single etcd for the tester instance
@@ -145,21 +160,30 @@ def decorate_with_transport(transport_name):
 @ray.remote
 class WorkerActor:
     def __init__(self, config, node_ip=None):
-        check_npu_is_available()
         self.config = config
         self.node_ip = node_ip
         self.data = None
+        # TODO: enhance robustness of device setting
+        torch.npu.set_device(0)
 
-    def setup_yr_ds(self, etcd_addr: str):
+    def setup_yr_ds(self, etcd_addr: str, connect_only_info: Optional[tuple] = None):
         # If an etcd address is provided, use it; otherwise start a local etcd
-        self.worker_host, self.worker_port = (
-            start_datasystem(etcd_addr)
-            if self.node_ip is None
-            else start_datasystem(etcd_addr, host=self.node_ip)
-        )
+        self.worker_host = self.worker_port = None
+        if connect_only_info is None:
+            print(f"Starting datasystem with etcd at: {etcd_addr}")
+            self.worker_host, self.worker_port = (
+                start_datasystem(etcd_addr)
+                if self.node_ip is None
+                else start_datasystem(etcd_addr, worker_host=self.node_ip)
+            )
+        else:
+            print(f"Starting datasystem with connect_only_info: {connect_only_info}")
+            self.worker_host, self.worker_port = connect_only_info
+
         os.environ["YR_DS_WORKER_HOST"] = self.worker_host
         os.environ["YR_DS_WORKER_PORT"] = str(self.worker_port)
         os.environ["ASCEND_RT_VISIBLE_DEVICES"] = "0"
+        return self.worker_host, self.worker_port
 
     def close_yr_ds(self):
         try:
@@ -186,14 +210,12 @@ class WorkerActor:
     def transport_tensor_via_yr(self) -> torch.Tensor:
         return self.data
 
-    @ray.method(tensor_transport="HCCL")
-    def transport_tensor_via_hccl(self) -> torch.Tensor:
-        return self.data
+    # TODO(dpj): Add HCCL transport test after HCCL transport is supported in Ray-ascend.
+    # @ray.method(tensor_transport="HCCL")
+    # def transport_tensor_via_hccl(self) -> torch.Tensor:
+    #     return self.data
 
-    def recv_tensor(self, data_ref) -> torch.Tensor:
-        if not isinstance(data_ref, ray.ObjectRef):
-            raise ValueError("Expected a Ray ObjectRef for the tensor data.")
-        data = ray.get(data_ref)
+    def recv_tensor(self, data: torch.Tensor) -> torch.Tensor:
         logger.info(f"Received tensor of size {data.shape}")
         return data
 
@@ -210,38 +232,37 @@ class YRDirectTransportBandwidthTester:
         self._initialize_data_system()
 
     def _initialize_data_system(self):
+        # TODO: support cpu transport test after YR transport supports cpu tensors
         if self.remote_mode == "remote":
             logger.info("Initializing data system client in remote mode...")
             # etcd is started by the class decorator; pass its address to actors
-            # TODO: support npu resource allocation for actors
             self.writer_actor = WorkerActor.options(
-                resources={f"node:{HEAD_NODE_IP}": 0.001}
+                resources={f"node:{HEAD_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, HEAD_NODE_IP)
             ray.get(
-                self.writer_actor.setup_yr_ds.remote(
-                    getattr(self, "_etcd_addr", None), None
-                )
+                self.writer_actor.setup_yr_ds.remote(getattr(self, "_etcd_addr", None))
             )
             self.reader_actor = WorkerActor.options(
-                resources={f"node:{WORKER_NODE_IP}": 0.001}
+                resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, WORKER_NODE_IP)
             ray.get(
-                self.reader_actor.setup_yr_ds.remote(
-                    getattr(self, "_etcd_addr", None), None
-                )
+                self.reader_actor.setup_yr_ds.remote(getattr(self, "_etcd_addr", None))
             )
         else:
             logger.info("Initializing data system client in local mode...")
-            self.writer_actor = WorkerActor.remote(self.config)
-            ray.get(
-                self.writer_actor.setup_yr_ds.remote(
-                    getattr(self, "_etcd_addr", None), None
-                )
+            logger.info(f"etcd address is {getattr(self, '_etcd_addr', None)}")
+            self.writer_actor = WorkerActor.options(resources={"NPU": 1}).remote(
+                self.config
             )
-            self.reader_actor = WorkerActor.remote(self.config)
+            local_ds_info = ray.get(
+                self.writer_actor.setup_yr_ds.remote(getattr(self, "_etcd_addr", None))
+            )
+            self.reader_actor = WorkerActor.options(resources={"NPU": 1}).remote(
+                self.config
+            )
             ray.get(
                 self.reader_actor.setup_yr_ds.remote(
-                    getattr(self, "_etcd_addr", None), None
+                    getattr(self, "_etcd_addr", None), local_ds_info
                 )
             )
 
@@ -256,12 +277,9 @@ class YRDirectTransportBandwidthTester:
         end_create_data = time.time()
         logger.info(f"Data creation time: {end_create_data - start_create_data:.8f}s")
 
-        assert yr_is_available_in_actor(
-            self.writer_actor
-        ), "YR transport is not available in writer actor!"
-        assert yr_is_available_in_actor(
-            self.reader_actor
-        ), "YR transport is not available in reader actor!"
+        # warm up
+        data_ref = self.writer_actor.transport_tensor_via_yr.remote()
+        results = ray.get(self.reader_actor.recv_tensor.remote(data_ref))
 
         logger.info("Starting transport operation...")
         start_transport = time.time()
@@ -276,7 +294,7 @@ class YRDirectTransportBandwidthTester:
         logger.info(f"Transport Throughput: {transport_throughput_gbps:.8f} Gb/s")
         time.sleep(2)
 
-        mode_name = "TQ REMOTE" if self.remote_mode else "TQ NORMAL"
+        mode_name = "YR REMOTE" if self.remote_mode else "YR NORMAL"
         logger.info("=" * 60)
         logger.info(f"{mode_name} BANDWIDTH TEST SUMMARY")
         logger.info("=" * 60)
@@ -296,8 +314,11 @@ def main():
     config = parse_args()
     logger.info(f"Test configuration: {OmegaConf.to_yaml(config)}")
     config = OmegaConf.merge(data_conf, config)
+
+    # TODO: support for remote actor to check NPU device
     if config.device == "npu":
         check_npu_is_available()
+
     if config.backend == "yr":
         tester = YRDirectTransportBandwidthTester(config, remote_mode=config.placement)
     else:
