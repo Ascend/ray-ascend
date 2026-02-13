@@ -3,7 +3,7 @@
 ## Build the docs
 ```bash
 # Install the dependencies
-pip install -r requirements-docs.txt
+pip install -r docs/requirements-docs.txt
 
 # Build the docs
 # Generate deployable static websites and PDFs in the `site/` directory.
