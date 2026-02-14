@@ -23,7 +23,7 @@ The default ray natively supports Ascend NPU as a pre-defined resource type to b
 - Architecture: aarch64, x86
 - OS kernel: linux
 - Python dependencies
-  - python>=3.10, <=3.12
+  - python>=3.10, <=3.11
   - CANN==8.2.rc1
   - torch==2.7.1, torch-npu==2.7.1.post1
   - ray (the same version as ray-ascend)

@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Community maintained hardware plugin for Ray on Ascend"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE"}
+license = {text = "Apache 2.0"}
 authors = [
     {name = "ray-ascend contributors"}
 ]
@@ -22,7 +22,6 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: System :: Distributed Computing",
 ]
@@ -54,10 +53,11 @@ include = ["ray_ascend*"]
 
 [tool.setuptools_scm]
 write_to = "ray_ascend/_version.py"
+fallback_version = "0.1.0+dev"
 
 [tool.black]
 line-length = 88
-target-version = ['py310', 'py311', 'py312']
+target-version = ['py310', 'py311']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
