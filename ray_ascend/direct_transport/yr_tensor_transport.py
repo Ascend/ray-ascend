@@ -16,14 +16,15 @@ if TYPE_CHECKING:
     import torch
 
 try:
-    from yr.datasystem import DsTensorClient
     import torch
     import torch_npu
+    from yr.datasystem import DsTensorClient
 except ImportError as e:
     raise ImportError(
         "The 'yr_tensor_transport' feature requires yr optional dependencies. "
         "Please install them with: pip install 'ray-ascend[yr]'"
     ) from e
+
 
 @dataclass
 class YRCommunicatorMetadata(CommunicatorMetadata):
