@@ -68,18 +68,31 @@ collective.broadcast(tensor, src_rank=0, group_name="my_group")
 
 ```python
 import ray
-from ray_ascend.direct_transport import HCCLTensorTransport
+from ray.util.collective import create_collective_group
 from ray.experimental import register_tensor_transport
+from ray_ascend.collective import HCCLGroup
+from ray_ascend.direct_transport import HCCLTensorTransport
+
+ray.register_collective_backend("HCCL", HCCLGroup)
 register_tensor_transport("HCCL", ["npu"], HCCLTensorTransport)
 
-@ray.remote
+
+@ray.remote(resources={"NPU": 1})
 class RayActor:
     @ray.method(tensor_transport="HCCL")
-    def transfer_npu_tensor_via_hccs():
+    def random_tensor(self):
         return torch.zeros(1024, device="npu")
 
-sender = RayActor.remote()
-npu_tensor = ray.get(sender.transfer_npu_tensor_via_hccs())
+    def sum(self, tensor: torch.Tensor):
+        return torch.sum(tensor)
+
+
+sender, receiver = RayActor.remote(), RayActor.remote()
+group = create_collective_group([sender, receiver], backend="HCCL")
+
+tensor = sender.random_tensor.remote()
+result = receiver.sum.remote(tensor)
+ray.get(result)
 ```
 
 ### Transport Ascend NPU tensors via [HCCS](https://www.hiascend.com/document/detail/zh/Glossary/gls/gls_0001.html#ZH-CN_TOPIC_0000002210355753__section665813471086) and CPU tensors via RDMA
@@ -92,7 +105,7 @@ from ray_ascend.direct_transport import YRTensorTransport
 from ray.experimental import register_tensor_transport
 register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
 
-@ray.remote
+@ray.remote(resources={"NPU": 1})
 class RayActor:
     @ray.method(tensor_transport="YR")
     def transfer_npu_tensor_via_hccs():
