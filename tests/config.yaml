@@ -1,0 +1,8 @@
+backend: yr
+placement: remote
+device: npu
+head_node_ip: "192.168.1.10"
+worker_node_ip: "192.168.1.11"
+tensor_size: 4096
+warmup_times: 5
+output_format: json

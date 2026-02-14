@@ -35,10 +35,7 @@ WORKER_NODE_IP = "NodeB"  # Replace with your worker node IP
 # You can modify the parameters according to
 # https://www.yuque.com/haomingzi-lfse7/lhp4el/tml8ke0zkgn6roey?singleDoc#
 config_str = """
-  global_batch_size: 1024
-  seq_length: 8192
-  num_global_batch: 1
-  num_data_storage_units: 8
+  tensor_size: 1024
 """
 data_conf = OmegaConf.create(config_str)
 
@@ -62,8 +59,8 @@ def yr_is_available_in_actor(actor: "ray.actor.ActorHandle") -> bool:
     return bool(gpu_object_manager.actor_has_tensor_transport(actor, "YR"))
 
 
-def compute_total_size(batch_size: int, seq_length: int) -> float:
-    total_size_bytes = batch_size * seq_length * 4
+def compute_total_size(tensor_size: int) -> float:
+    total_size_bytes = tensor_size * 4  # Assuming float32 (4 bytes per element)
     total_size_gb = total_size_bytes / (1024**3)
     logger.info(f"Total data size: {total_size_gb:.6f} GB")
 
@@ -72,36 +69,101 @@ def compute_total_size(batch_size: int, seq_length: int) -> float:
 
 # TODO: support more configurations (Currently only YR with NPU is supported) and config file parsing
 def parse_args() -> dict:
+    """
+    The following parameters are not currently supported:
+    transport
+    warmup-times
+    output-format
+    config-file
+    """
+    arg_configs = [
+        {
+            "name": "--backend",
+            "type": str,
+            "choices": ["yr", "hccl"],
+            "required": True,
+            "help": "Transport backend: 'yr' for YR Direct Transport, 'hccl' for HCCL."
+        },
+        {
+            "name": "--placement",
+            "type": str,
+            "choices": ["local", "remote"],
+            "default": "local",
+            "help": (
+                "Test deployment mode. \n"
+                "'local': all actors run on the same node (default). \n"
+                "'remote': actors are distributed across multiple nodes. \n"
+                "To use 'remote', first set up a Ray cluster: \n"
+                "on head node: `ray start --head --resources='{\"node:<HEAD_IP>\": 1}'`; \n"
+                "on worker node: `ray start --address <HEAD_IP>:6379 --resources='{\"node:<WORKER_IP>\": 1}'`. \n"
+                "Replace <HEAD_IP> and <WORKER_IP> with actual IPs."
+            )
+        },
+        {
+            "name": "--transport",
+            "type": str,
+            "choices": ["tcp", "rdma", "hccs"],
+            "help": "Transport protocol: 'tcp' or 'rdma' for 'yr'; 'hccs' for 'hccl'."
+        },
+        {
+            "name": "--device",
+            "type": str,
+            "choices": ["npu", "cpu"],
+            "default": "cpu",
+            "help": "Device to run tensors on: 'npu' or 'cpu'."
+        },
+        {
+            "name": "--head-node-ip",
+            "type": str,
+            "help": "IP address of the Ray head node. Required in 'remote' mode; driver must run on head node."
+        },
+        {
+            "name": "--worker-node-ip",
+            "type": str,
+            "help": "IP address of the worker node. Required in 'remote' mode."
+        },
+        {
+            "name": "--tensor-size",
+            "type": int,
+            "default": 1024,
+            "help": "Total number of elements in the tensor to transport (default: 1024)."
+        },
+        {
+            "name": "--output-format",
+            "type": str,
+            "choices": ["stdout", "json", "csv"],
+            "default": "stdout",
+            "help": "Output format for performance results (default: stdout)."
+        },
+        {
+            "name": "--warmup-times",
+            "type": int,
+            "default": 3,
+            "help": "Number of warmup iterations before measurement (default: 3)."
+        },
+        {
+            "name": "--config-file",
+            "type": str,
+            "help": (
+                "Path to a YAML config file with test parameters. "
+                "Command-line arguments override config file settings."
+            )
+        },
+    ]
+
+    
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--backend",
-        type=str,
-        choices=["yr", "hccl"],
-        required=True,
-        help="Backend must be ['yr', 'hccl']",
-    )
-    parser.add_argument(
-        "--placement",
-        type=str,
-        default="local",
-        choices=["local", "remote"],
-        help="['local', 'remote']",
-    )
-    parser.add_argument(
-        "--transport",
-        type=str,
-        choices=["tcp", "rdma", "hccs"],
-        help="['tcp', 'rdma'] for yr or ['hccs'] for hccl",
-    )
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="cpu",
-        choices=["npu", "cpu"],
-        help="['npu', 'cpu']",
-    )
+    for arg in arg_configs:
+        parser.add_argument(arg["name"], **{k: v for k, v in arg.items() if k != "name"})
     args = parser.parse_args()
-    return vars(args)
+    config = vars(args)
+    if config["placement"] == "remote":
+    if not config.get("head_node_ip"):
+        parser.error("--head-node-ip is required when --placement=remote")
+    if not config.get("worker_node_ip"):
+        parser.error("--worker-node-ip is required when --placement=remote")
+    logger.info(f"Test configuration:\n{OmegaConf.to_yaml(config)}")
+    return config
 
 
 def decorate_with_transport(transport_name):
@@ -166,7 +228,7 @@ class WorkerActor:
         # TODO: enhance robustness of device setting
         torch.npu.set_device(0)
 
-    def setup_yr_ds(self, etcd_addr: str, connect_only_info: Optional[tuple] = None):
+    def setup_yr_ds(self, etcd_addr: str, *, worker_host: Optional[str] = None, connect_only_info: Optional[tuple] = None):
         # If an etcd address is provided, use it; otherwise start a local etcd
         self.worker_host = self.worker_port = None
         if connect_only_info is None:
@@ -240,13 +302,13 @@ class YRDirectTransportBandwidthTester:
                 resources={f"node:{HEAD_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, HEAD_NODE_IP)
             ray.get(
-                self.writer_actor.setup_yr_ds.remote(getattr(self, "_etcd_addr", None))
+                self.writer_actor.setup_yr_ds.remote(getattr(self, "_etcd_addr", None), worker_host=HEAD_NODE_IP)
             )
             self.reader_actor = WorkerActor.options(
                 resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, WORKER_NODE_IP)
             ray.get(
-                self.reader_actor.setup_yr_ds.remote(getattr(self, "_etcd_addr", None))
+                self.reader_actor.setup_yr_ds.remote(getattr(self, "_etcd_addr", None), worker_host=WORKER_NODE_IP)
             )
         else:
             logger.info("Initializing data system client in local mode...")
@@ -267,10 +329,7 @@ class YRDirectTransportBandwidthTester:
             )
 
     def run_bandwidth_test(self):
-        total_data_size_gb = compute_total_size(
-            batch_size=self.config.global_batch_size,
-            seq_length=self.config.seq_length,
-        )
+        total_data_size_gb = compute_total_size(self.config.tensor_size)
         logger.info("Creating large batch for bandwidth test...")
         start_create_data = time.time()
         data = ray.get(self.writer_actor.generate_tensor.remote())
@@ -312,7 +371,6 @@ class YRDirectTransportBandwidthTester:
 
 def main():
     config = parse_args()
-    logger.info(f"Test configuration: {OmegaConf.to_yaml(config)}")
     config = OmegaConf.merge(data_conf, config)
 
     # TODO: support for remote actor to check NPU device
