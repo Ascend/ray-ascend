@@ -35,10 +35,6 @@ WORKER_NODE_IP = "NodeB"  # Replace with your worker node IP
 # This is the Medium setting of the performance test.
 # You can modify the parameters according to
 # https://www.yuque.com/haomingzi-lfse7/lhp4el/tml8ke0zkgn6roey?singleDoc#
-config_str = """
-  tensor_size: 1024
-"""
-data_conf = OmegaConf.create(config_str)
 
 
 def check_npu_is_available() -> None:
@@ -178,14 +174,14 @@ def parse_args() -> dict:
     parser.set_defaults(**config_defaults)
     final_args = parser.parse_args()
 
-    config = vars(final_args)
-    if config["placement"] == "remote":
-        if not config.get("head_node_ip"):
+    if final_args.placement == "remote":
+        if not final_args.head_node_ip:
             parser.error("--head-node-ip is required when --placement=remote")
-        if not config.get("worker_node_ip"):
+        if not final_args.worker_node_ip:
             parser.error("--worker-node-ip is required when --placement=remote")
-    logger.info(f"Test configuration:\n{OmegaConf.to_yaml(config)}")
-    return config
+    
+    logger.info(f"Test configuration:\n{OmegaConf.to_yaml(vars(final_args))}")
+    return final_args
 
 
 def decorate_with_transport(transport_name):
@@ -247,6 +243,7 @@ class WorkerActor:
         self.config = config
         self.node_ip = node_ip
         self.data = None
+        self.actor_has_created_yr_ds = False
         # TODO: enhance robustness of device setting
         torch.npu.set_device(0)
 
@@ -254,13 +251,13 @@ class WorkerActor:
         self,
         etcd_addr: str,
         *,
-        worker_host: Optional[str] = None,
         connect_only_info: Optional[tuple] = None,
     ):
         # If an etcd address is provided, use it; otherwise start a local etcd
         self.worker_host = self.worker_port = None
         if connect_only_info is None:
             print(f"Starting datasystem with etcd at: {etcd_addr}")
+            self.actor_has_created_yr_ds = True
             self.worker_host, self.worker_port = (
                 start_datasystem(etcd_addr)
                 if self.node_ip is None
@@ -276,6 +273,9 @@ class WorkerActor:
         return self.worker_host, self.worker_port
 
     def close_yr_ds(self):
+        if not self.actor_has_created_yr_ds:
+            logger.warning("This actor did not create the datasystem, skipping close.")
+            return
         try:
             ds_stop_cmd = [
                 "dscli",
@@ -290,8 +290,7 @@ class WorkerActor:
 
     def generate_tensor(self) -> torch.Tensor:
         self.data = torch.randn(
-            self.config.global_batch_size,
-            self.config.seq_length,
+            self.config.tensor_size,
             device=self.config.device,
         )
         return self.data
@@ -356,7 +355,7 @@ class YRDirectTransportBandwidthTester:
             )
             ray.get(
                 self.reader_actor.setup_yr_ds.remote(
-                    getattr(self, "_etcd_addr", None), local_ds_info
+                    getattr(self, "_etcd_addr", None), connect_only_info=local_ds_info
                 )
             )
 
@@ -369,8 +368,9 @@ class YRDirectTransportBandwidthTester:
         logger.info(f"Data creation time: {end_create_data - start_create_data:.8f}s")
 
         # warm up
-        data_ref = self.writer_actor.transport_tensor_via_yr.remote()
-        results = ray.get(self.reader_actor.recv_tensor.remote(data_ref))
+        for i in range(self.config.warmup_times):
+            data_ref = self.writer_actor.transport_tensor_via_yr.remote()
+            results = ray.get(self.reader_actor.recv_tensor.remote(data_ref))
 
         logger.info("Starting transport operation...")
         start_transport = time.time()
@@ -403,7 +403,6 @@ class YRDirectTransportBandwidthTester:
 
 def main():
     config = parse_args()
-    config = OmegaConf.merge(data_conf, config)
 
     # TODO: support for remote actor to check NPU device
     if config.device == "npu":
