@@ -238,44 +238,40 @@ def decorate_with_transport(transport_name):
 
 
 @ray.remote
-class WorkerActor:
-    def __init__(self, config, node_ip=None):
-        self.config = config
+class DataSystemActor:
+    
+    def __init__(self, etcd_addr: str, node_ip: Optional[str] = None):
+        self.etcd_addr = etcd_addr
         self.node_ip = node_ip
-        self.data = None
-        self.actor_has_created_yr_ds = False
-        # TODO: enhance robustness of device setting
-        torch.npu.set_device(0)
+        self.worker_host: Optional[str] = None
+        self.worker_port: Optional[int] = None
+        self.ds_started = False
 
-    def setup_yr_ds(
-        self,
-        etcd_addr: str,
-        *,
-        connect_only_info: Optional[tuple] = None,
-    ):
-        # If an etcd address is provided, use it; otherwise start a local etcd
-        self.worker_host = self.worker_port = None
-        if connect_only_info is None:
-            print(f"Starting datasystem with etcd at: {etcd_addr}")
-            self.actor_has_created_yr_ds = True
-            self.worker_host, self.worker_port = (
-                start_datasystem(etcd_addr)
-                if self.node_ip is None
-                else start_datasystem(etcd_addr, worker_host=self.node_ip)
-            )
-        else:
-            print(f"Starting datasystem with connect_only_info: {connect_only_info}")
-            self.worker_host, self.worker_port = connect_only_info
+    def start_datasystem(self) -> tuple[str, int]:
+        if self.ds_started:
+            logger.warning("DataSystem already started")
+            return self.worker_host, self.worker_port
 
-        os.environ["YR_DS_WORKER_HOST"] = self.worker_host
-        os.environ["YR_DS_WORKER_PORT"] = str(self.worker_port)
-        os.environ["ASCEND_RT_VISIBLE_DEVICES"] = "0"
-        return self.worker_host, self.worker_port
+        try:
+            if self.node_ip is None:
+                self.worker_host, self.worker_port = start_datasystem(self.etcd_addr)
+            else:
+                self.worker_host, self.worker_port = start_datasystem(
+                    self.etcd_addr, worker_host=self.node_ip
+                )
+            
+            self.ds_started = True
+            logger.info(f"DataSystem started at {self.worker_host}:{self.worker_port}")
+            return self.worker_host, self.worker_port
+        except Exception as e:
+            logger.error(f"Failed to start datasystem: {e}")
+            raise
 
-    def close_yr_ds(self):
-        if not self.actor_has_created_yr_ds:
-            logger.warning("This actor did not create the datasystem, skipping close.")
+    def stop_datasystem(self) -> None:
+        if not self.ds_started:
+            logger.warning("DataSystem not started, skipping stop")
             return
+
         try:
             ds_stop_cmd = [
                 "dscli",
@@ -284,28 +280,58 @@ class WorkerActor:
                 f"{self.worker_host}:{self.worker_port}",
             ]
             subprocess.run(ds_stop_cmd, check=True, timeout=180)
-
+            self.ds_started = False
+            logger.info("DataSystem stopped successfully")
         except Exception as e:
             logger.error(f"Failed to stop datasystem: {e}")
+
+    def get_datasystem_info(self) -> tuple[str, int]:
+        if not self.ds_started:
+            raise RuntimeError("DataSystem not started yet")
+        return self.worker_host, self.worker_port
+
+
+@ray.remote
+class TensorTransportActor:
+    
+    def __init__(self, config, node_ip: Optional[str] = None):
+        self.config = config
+        self.node_ip = node_ip
+        self.data: Optional[torch.Tensor] = None
+        self.ds_info: Optional[tuple[str, int]] = None
+        if os.getenv("YR_DS_WORKER_HOST") and os.getenv("YR_DS_WORKER_PORT"):
+            self.ds_info = (os.getenv("YR_DS_WORKER_HOST"), int(os.getenv("YR_DS_WORKER_PORT")))
+            logger.info(f"DataSystem info loaded from environment: {self.ds_info}")
+        # TODO: enhance robustness of device setting
+        torch.npu.set_device(0)
+
+    def setup_yr_env(self, ds_info: tuple[str, int]) -> None:
+        """setup environment variables for YR transport"""
+        if self.ds_info:
+            logger.warning("DataSystem info already set, skipping environment setup")
+            return
+        self.ds_info = ds_info
+        worker_host, worker_port = ds_info
+        os.environ["YR_DS_WORKER_HOST"] = worker_host
+        os.environ["YR_DS_WORKER_PORT"] = str(worker_port)
+        logger.info(f"DataSystem environment configured: {worker_host}:{worker_port}")
 
     def generate_tensor(self) -> torch.Tensor:
         self.data = torch.randn(
             self.config.tensor_size,
             device=self.config.device,
         )
+        logger.info(f"Generated tensor of shape {self.data.shape}")
         return self.data
 
     @ray.method(tensor_transport="YR")
     def transport_tensor_via_yr(self) -> torch.Tensor:
+        if self.data is None:
+            raise RuntimeError("Tensor not generated yet. Call generate_tensor first.")
         return self.data
 
-    # TODO(dpj): Add HCCL transport test after HCCL transport is supported in Ray-ascend.
-    # @ray.method(tensor_transport="HCCL")
-    # def transport_tensor_via_hccl(self) -> torch.Tensor:
-    #     return self.data
-
     def recv_tensor(self, data: torch.Tensor) -> torch.Tensor:
-        logger.info(f"Received tensor of size {data.shape}")
+        logger.info(f"Received tensor of shape {data.shape}")
         return data
 
 
@@ -318,64 +344,75 @@ class YRDirectTransportBandwidthTester:
     def __init__(self, config, remote_mode="local"):
         self.config = config
         self.remote_mode = remote_mode
+        self.head_ds_actor: Optional[ray.actor.ActorHandle] = None
+        self.worker_ds_actor: Optional[ray.actor.ActorHandle] = None
         self._initialize_data_system()
 
     def _initialize_data_system(self):
+        if self.remote_mode == "remote":
+            logger.info("Initializing data system client in remote mode...")
+            # etcd is started by the class decorator; pass its address to actors
+            self.head_ds_actor = DataSystemActor.options(
+                resources={f"node:{HEAD_NODE_IP}": 0.001, "NPU": 1}
+            ).remote(getattr(self, "_etcd_addr", None), node_ip=HEAD_NODE_IP)
+            self.head_ds_info = ray.get(self.head_ds_actor.start_datasystem.remote())
+            self.worker_ds_actor = DataSystemActor.options(
+                resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
+            ).remote(getattr(self, "_etcd_addr", None), node_ip=WORKER_NODE_IP)
+            self.worker_ds_info = ray.get(self.worker_ds_actor.start_datasystem.remote())
+        else:
+            logger.info("Initializing data system client in local mode...")
+            logger.info(f"etcd address is {getattr(self, '_etcd_addr', None)}")
+            self.head_ds_actor = self.worker_ds_actor = DataSystemActor.options(resources={"NPU": 1}).remote(
+                getattr(self, "_etcd_addr", None)
+            )
+            self.head_ds_info = self.worker_ds_info = ray.get(self.head_ds_actor.start_datasystem.remote())
+
+    def _initialize_test_actor(self):
         # TODO: support cpu transport test after YR transport supports cpu tensors
         if self.remote_mode == "remote":
             logger.info("Initializing data system client in remote mode...")
             # etcd is started by the class decorator; pass its address to actors
-            self.writer_actor = WorkerActor.options(
+            writer_actor = TensorTransportActor.options(
                 resources={f"node:{HEAD_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, HEAD_NODE_IP)
-            ray.get(
-                self.writer_actor.setup_yr_ds.remote(
-                    getattr(self, "_etcd_addr", None), worker_host=HEAD_NODE_IP
-                )
-            )
-            self.reader_actor = WorkerActor.options(
+
+            reader_actor = TensorTransportActor.options(
                 resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, WORKER_NODE_IP)
-            ray.get(
-                self.reader_actor.setup_yr_ds.remote(
-                    getattr(self, "_etcd_addr", None), worker_host=WORKER_NODE_IP
-                )
-            )
+            
         else:
             logger.info("Initializing data system client in local mode...")
             logger.info(f"etcd address is {getattr(self, '_etcd_addr', None)}")
-            self.writer_actor = WorkerActor.options(resources={"NPU": 1}).remote(
+            writer_actor = TensorTransportActor.options(resources={"NPU": 1}).remote(
                 self.config
             )
-            local_ds_info = ray.get(
-                self.writer_actor.setup_yr_ds.remote(getattr(self, "_etcd_addr", None))
-            )
-            self.reader_actor = WorkerActor.options(resources={"NPU": 1}).remote(
+            reader_actor = TensorTransportActor.options(resources={"NPU": 1}).remote(
                 self.config
             )
-            ray.get(
-                self.reader_actor.setup_yr_ds.remote(
-                    getattr(self, "_etcd_addr", None), connect_only_info=local_ds_info
-                )
-            )
+            
+        ray.get(reader_actor.setup_yr_env.remote(self.worker_ds_info))
+        ray.get(writer_actor.setup_yr_env.remote(self.head_ds_info))
+        return writer_actor, reader_actor
 
     def run_bandwidth_test(self):
+        writer_actor, reader_actor = self._initialize_test_actor()
         total_data_size_gb = compute_total_size(self.config.tensor_size)
         logger.info("Creating large batch for bandwidth test...")
         start_create_data = time.time()
-        data = ray.get(self.writer_actor.generate_tensor.remote())
+        data = ray.get(writer_actor.generate_tensor.remote())
         end_create_data = time.time()
         logger.info(f"Data creation time: {end_create_data - start_create_data:.8f}s")
 
         # warm up
         for i in range(self.config.warmup_times):
-            data_ref = self.writer_actor.transport_tensor_via_yr.remote()
-            results = ray.get(self.reader_actor.recv_tensor.remote(data_ref))
+            data_ref = writer_actor.transport_tensor_via_yr.remote()
+            results = ray.get(reader_actor.recv_tensor.remote(data_ref))
 
         logger.info("Starting transport operation...")
         start_transport = time.time()
-        data_ref = self.writer_actor.transport_tensor_via_yr.remote()
-        results = ray.get(self.reader_actor.recv_tensor.remote(data_ref))
+        data_ref = writer_actor.transport_tensor_via_yr.remote()
+        results = ray.get(reader_actor.recv_tensor.remote(data_ref))
         assert torch.equal(results, data), "Data mismatch after transport!"
         end_transport = time.time()
         transport_time = end_transport - start_transport
@@ -385,7 +422,7 @@ class YRDirectTransportBandwidthTester:
         logger.info(f"Transport Throughput: {transport_throughput_gbps:.8f} Gb/s")
         time.sleep(2)
 
-        mode_name = "YR REMOTE" if self.remote_mode else "YR NORMAL"
+        mode_name = "YR REMOTE" if self.remote_mode == "remote" else "YR NORMAL"
         logger.info("=" * 60)
         logger.info(f"{mode_name} BANDWIDTH TEST SUMMARY")
         logger.info("=" * 60)
@@ -396,10 +433,11 @@ class YRDirectTransportBandwidthTester:
             f"Network Round-trip Throughput: {(total_data_size_gb * 8) / transport_time:.8f} Gb/s"
         )
 
-        w = self.writer_actor.close_yr_ds.remote()
-        r = self.reader_actor.close_yr_ds.remote()
-        ray.get([w, r])
-
+    def close_datasystem(self):
+        if self.head_ds_actor:
+             ray.get(self.head_ds_actor.stop_datasystem.remote())
+        if self.worker_ds_actor and self.worker_ds_actor != self.head_ds_actor:
+            ray.get(self.worker_ds_actor.stop_datasystem.remote())
 
 def main():
     config = parse_args()
@@ -413,7 +451,10 @@ def main():
     else:
         raise NotImplementedError(f"Unsupported backend: {config.backend}")
 
-    tester.run_bandwidth_test()
+    try:
+        tester.run_bandwidth_test()
+    finally:
+        tester.close_datasystem()
 
 
 if __name__ == "__main__":
