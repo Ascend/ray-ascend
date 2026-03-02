@@ -113,7 +113,7 @@ class YRTensorTransport(TensorTransportManager):
                     get_tensor_transport_manager,
                 )
 
-                return ( # type: ignore[no-any-return]
+                return (  # type: ignore[no-any-return]
                     get_tensor_transport_manager("YR")
                     .get_ds_client("cpu")
                     .health_check()
@@ -122,7 +122,7 @@ class YRTensorTransport(TensorTransportManager):
                 logger.error(f"Raise Exception during health check: {e}")
                 return False
 
-        return ray.get( # type: ignore[no-any-return]
+        return ray.get(  # type: ignore[no-any-return]
             actor.__ray_call__.options(concurrency_group="_ray_system").remote(
                 __ray_actor_has_tensor_transport__
             )
