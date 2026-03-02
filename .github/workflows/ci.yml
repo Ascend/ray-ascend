@@ -1,4 +1,4 @@
-name: Ray Ascend Full Test
+name: ray-ascend ci
 
 on:
   pull_request:
@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Build Python wheels for each Python version
-  build-wheels:
+  build-and-test:
     runs-on: linux-aarch64-910c-2
     container:
       image: ascendai/cann:latest
+    timeout-minutes: 5
     strategy:
       matrix:
         python-version: ["3.10", "3.11"]
@@ -23,29 +23,20 @@ jobs:
           pip${{ matrix.python-version }} install build
           python${{ matrix.python-version }} -m build --wheel
           pip${{ matrix.python-version }} install "dist/*.whl[test,yr]" --force-reinstall
-
-  # Run tests for each Python version
-  run-tests:
-    runs-on: linux-aarch64-910c-2
-    container:
-      image: ascendai/cann:latest
-    timeout-minutes: 5
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11"]
-    steps:
       - name: Run tests for Python ${{ matrix.python-version }}
         run: |
           echo "Running tests for Python ${{ matrix.python-version }}..."
           python${{ matrix.python-version }} -m pytest -v tests/
 
-  # Build documentation (only Python 3.10)
   build-docs:
-    runs-on: linux-aarch64-910c-2
-    container:
-      image: ascendai/cann:latest
+    runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Python 3.10
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: 3.10
       - name: Build documentation
         run: |
-          pip3.10 install -r docs/requirements-docs.txt
-          python3.10 -m mkdocs build -f docs/mkdocs.yml
+          pip install -r docs/requirements-docs.txt
+          python -m mkdocs build -f docs/mkdocs.yml

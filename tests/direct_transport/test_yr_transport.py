@@ -1,3 +1,4 @@
+import os
 import pickle
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,12 @@ from ray_ascend.direct_transport.yr_tensor_transport import (
     YRTensorTransport,
     YRTransportMetadata,
 )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def prepare_yr_env():
+    os.environ["YR_DS_WORKER_HOST"] = "127.0.0.1"
+    os.environ["YR_DS_WORKER_PORT"] = "31501"
 
 
 @pytest.fixture(params=["cpu", "npu"])

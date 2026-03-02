@@ -34,7 +34,7 @@ version = {attr = "ray_ascend.__version__"}
 test = [
     "torch==2.7.1+cpu; platform_machine == 'x86_64'",
     "torch==2.7.1; platform_machine == 'aarch64'",
-    "torch-npu==2.7.1.post1",
+    "torch-npu==2.7.1.post2",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.20.0",
 ]
@@ -43,7 +43,7 @@ yr = [
     "openyuanrong-datasystem>=0.6.3",
     "torch==2.7.1+cpu; platform_machine == 'x86_64'",
     "torch==2.7.1; platform_machine == 'aarch64'",
-    "torch-npu==2.7.1.post1",
+    "torch-npu==2.7.1.post2",
 ]
 
 [project.urls]
