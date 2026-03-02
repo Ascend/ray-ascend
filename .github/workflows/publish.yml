@@ -13,7 +13,7 @@ on:
 
 jobs:
   build-package:
-    runs-on: linux-aarch64-910c-2
+    runs-on: linux-aarch64-a3-2
     container:
       image: ascendai/cann:latest
     strategy:
