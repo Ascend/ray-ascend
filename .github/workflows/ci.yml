@@ -23,6 +23,7 @@ jobs:
         run: |
           echo "Building for Python ${{ matrix.python-version }}..."
           pip${{ matrix.python-version }} install build
+          pip${{ matrix.python-version }} install -r requirements.txt
           python${{ matrix.python-version }} -m build --wheel
           pip${{ matrix.python-version }} install "$(ls dist/*.whl)[test,yr]" --force-reinstall
       - name: Run tests for Python ${{ matrix.python-version }}
