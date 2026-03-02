@@ -36,7 +36,7 @@ test = [
     "torch==2.7.1; platform_machine == 'aarch64'",
     "torch-npu==2.7.1.post2",
     "pytest>=7.0.0",
-    "pytest-asyncio>=0.20.0",
+    "pytest-cov",
 ]
 
 yr = [
