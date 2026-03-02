@@ -19,8 +19,18 @@ except ImportError:
     YR_AVAILABLE = False
 
 
+logger = logging.getLogger(__name__)
+
+
 def check_dscli_available() -> bool:
     return shutil.which("dscli") is not None
+
+
+def get_free_port():
+    """Find and return an available TCP port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        return s.getsockname()[1]
 
 
 def check_etcd_installed() -> None:
@@ -29,16 +39,6 @@ def check_etcd_installed() -> None:
         raise RuntimeError(
             "'etcd' is not installed or not found in PATH. Please install etcd and ensure it's accessible from the command line."
         )
-
-
-logger = logging.getLogger(__name__)
-
-
-def get_free_port():
-    """Find and return an available TCP port."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", 0))
-        return s.getsockname()[1]
 
 
 def start_etcd(

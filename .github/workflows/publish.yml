@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (without v prefix, e.g. 0.1.0)'
+        required: true
+        type: string
 
 jobs:
   build-package:
@@ -20,7 +25,13 @@ jobs:
 
       - name: Update version
         run: |
-          python${{ matrix.python-version }} ci/update_version.py
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Using manual version: ${{ inputs.version }}"
+            python${{ matrix.python-version }} ci/update_version.py ${{ inputs.version }}
+          else
+            echo "Using tag version: ${GITHUB_REF#refs/tags/v}"
+            python${{ matrix.python-version }} ci/update_version.py
+          fi
 
       - name: Build package for Python ${{ matrix.python-version }}
         run: |

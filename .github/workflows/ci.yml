@@ -1,4 +1,4 @@
-name: Ray Ascend CI
+name: Ray Ascend Full Test
 
 on:
   pull_request:
@@ -22,7 +22,7 @@ jobs:
           echo "Building for Python ${{ matrix.python-version }}..."
           pip${{ matrix.python-version }} install build
           python${{ matrix.python-version }} -m build --wheel
-          pip${{ matrix.python-version }} install dist/*.whl --force-reinstall
+          pip${{ matrix.python-version }} install "dist/*.whl[test,yr]" --force-reinstall
 
   # Run tests for each Python version
   run-tests:
