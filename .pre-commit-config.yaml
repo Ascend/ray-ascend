@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -10,22 +10,22 @@ repos:
       - id: check-toml
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.15.4
     hooks:
       - id: ruff
         args: [--fix, "--line-length=88", --exit-non-zero-on-fix, "--per-file-ignores=ray_ascend/direct_transport/yr_tensor_transport.py:F401"]
         args: [--select, "I", --fix, "--line-length=88", --exit-non-zero-on-fix]
 
   - repo: https://github.com/psf/black
-    rev: 24.1.0
+    rev: 26.1.0
     hooks:
       - id: black
         language_version: python3
         args: [--line-length=88]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
+    rev: v1.19.1
     hooks:
       - id: mypy
-        additional_dependencies: []
+        additional_dependencies: ["types-requests"]
         args: [--ignore-missing-imports]

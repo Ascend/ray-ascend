@@ -1,0 +1,37 @@
+name: DCO Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  check-dco:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for Signed-off-by
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const regex = /^Signed-off-by: .* <.*@.*>/m;
+            let failed = false;
+
+            for (const commit of commits.data) {
+              if (!regex.test(commit.commit.message)) {
+                console.log(`Commit ${commit.sha} is missing Signed-off-by`);
+                failed = true;
+              }
+            }
+
+            if (failed) {
+              core.setFailed('One or more commits are missing the Signed-off-by line.');
+            }

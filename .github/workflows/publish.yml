@@ -1,0 +1,77 @@
+name: Publish to GitHub Release and PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-package:
+    runs-on: linux-aarch64-910c-2
+    container:
+      image: ascendai/cann:latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Update version
+        run: |
+          python${{ matrix.python-version }} ci/update_version.py
+
+      - name: Build package for Python ${{ matrix.python-version }}
+        run: |
+          echo "Building for Python ${{ matrix.python-version }}..."
+          pip${{ matrix.python-version }} install --upgrade pip
+          pip${{ matrix.python-version }} install build
+          python${{ matrix.python-version }} -m build --wheel
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-packages-${{ matrix.python-version }}
+          path: dist/
+          retention-days: 7
+
+  publish-github-release:
+    needs: build-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-packages-*
+          path: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.whl
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    needs: build-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-packages-*
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/

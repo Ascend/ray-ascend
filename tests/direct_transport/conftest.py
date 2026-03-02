@@ -10,7 +10,26 @@ from typing import Optional
 
 import pytest
 import requests
-from yr import datasystem
+
+try:
+    from yr import datasystem
+
+    YR_AVAILABLE = True
+except ImportError:
+    YR_AVAILABLE = False
+
+
+def check_dscli_available() -> bool:
+    return shutil.which("dscli") is not None
+
+
+def check_etcd_installed() -> None:
+    """Raise RuntimeError if 'etcd' is not found in PATH."""
+    if shutil.which("etcd") is None:
+        raise RuntimeError(
+            "'etcd' is not installed or not found in PATH. Please install etcd and ensure it's accessible from the command line."
+        )
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +39,6 @@ def get_free_port():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
         return s.getsockname()[1]
-
-
-def check_etcd_installed() -> None:
-    """Raise RuntimeError if 'etcd' is not found in PATH."""
-    if shutil.which("etcd") is None:
-        raise RuntimeError(
-            "'etcd' is not installed or not found in PATH. Please install etcd and ensure it's accessible from the command line."
-        )
 
 
 def start_etcd(
@@ -155,6 +166,11 @@ def start_etcd_and_yr():
     Automatically shut down after tests.
     Yields (worker_host, worker_port).
     """
+    if not YR_AVAILABLE:
+        pytest.skip("yr library (yuanrong) not available, skipping YR tests")
+    if not check_dscli_available():
+        pytest.skip("dscli tool not available, skipping YR tests")
+
     etcd_proc = etcd_data_dir = None
     worker_host = worker_port = None
     try:

@@ -1,0 +1,47 @@
+name: Ray Ascend CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # Build Python wheels for each Python version
+  build-wheels:
+    runs-on: linux-aarch64-910c-2
+    container:
+      image: ascendai/cann:latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - name: Build Python ${{ matrix.python-version }} wheel
+        run: |
+          echo "Building for Python ${{ matrix.python-version }}..."
+          pip${{ matrix.python-version }} install build
+          python${{ matrix.python-version }} -m build --wheel
+          pip${{ matrix.python-version }} install dist/*.whl --force-reinstall
+
+  # Run tests for each Python version
+  run-tests:
+    runs-on: linux-aarch64-910c-2
+    container:
+      image: ascendai/cann:latest
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - name: Run tests for Python ${{ matrix.python-version }}
+        run: |
+          echo "Running tests for Python ${{ matrix.python-version }}..."
+          python${{ matrix.python-version }} -m pytest -v tests/
+
+  # Build documentation (only Python 3.10)
+  build-docs:
+    runs-on: linux-aarch64-910c-2
+    container:
+      image: ascendai/cann:latest
+    steps:
+      - name: Build documentation
+        run: |
+          pip3.10 install -r docs/requirements-docs.txt
+          python3.10 -m mkdocs build -f docs/mkdocs.yml

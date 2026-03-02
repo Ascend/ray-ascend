@@ -28,9 +28,13 @@ classifiers = [
 
 [tool.setuptools.dynamic]
 dependencies = {file = "requirements.txt"}
+version = {attr = "ray_ascend.__version__"}
 
 [project.optional-dependencies]
 test = [
+    "torch==2.7.1+cpu; platform_machine == 'x86_64'",
+    "torch==2.7.1; platform_machine == 'aarch64'",
+    "torch-npu==2.7.1.post1",
     "pytest>=7.0.0",
     "pytest-asyncio>=0.20.0",
 ]
@@ -43,17 +47,13 @@ yr = [
 ]
 
 [project.urls]
-Homepage = "https://gitcode.com/Ascend/ray-ascend"
-Repository = "https://gitcode.com/Ascend/ray-ascend"
-Issues = "https://gitcode.com/Ascend/ray-ascend/issues"
+Homepage = "https://github.com/Ascend/ray-ascend"
+Repository = "https://github.com/Ascend/ray-ascend"
+Issues = "https://github.com/Ascend/ray-ascend/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["ray_ascend*"]
-
-[tool.setuptools_scm]
-write_to = "ray_ascend/_version.py"
-fallback_version = "0.1.0+dev"
 
 [tool.black]
 line-length = 88
