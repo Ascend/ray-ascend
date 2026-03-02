@@ -12,17 +12,19 @@ jobs:
     runs-on: linux-aarch64-a3-2
     container:
       image: ascendai/cann:latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     strategy:
       matrix:
         python-version: ["3.10", "3.11"]
     steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Build Python ${{ matrix.python-version }} wheel
         run: |
           echo "Building for Python ${{ matrix.python-version }}..."
           pip${{ matrix.python-version }} install build
           python${{ matrix.python-version }} -m build --wheel
-          pip${{ matrix.python-version }} install "dist/*.whl[test,yr]" --force-reinstall
+          pip${{ matrix.python-version }} install "$(ls dist/*.whl)[test,yr]" --force-reinstall
       - name: Run tests for Python ${{ matrix.python-version }}
         run: |
           echo "Running tests for Python ${{ matrix.python-version }}..."
