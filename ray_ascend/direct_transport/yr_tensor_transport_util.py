@@ -1,16 +1,25 @@
 import pickle
 import warnings
 
-from yr.datasystem import KVClient
+try:
+    from yr.datasystem import KVClient
+except ImportError:
+    KVClient = None
+    warnings.warn(
+        "The 'yr_tensor_transport' feature requires optional dependencies"
+        "'datasystem', Install with: 'pip install openyuanrong-datasystem'",
+        RuntimeWarning,
+    )
 
 try:
     import torch_npu
     from yr.datasystem import DsTensorClient
 except ImportError:
+    DsTensorClient = None
     warnings.warn(
         "The 'yr_tensor_transport' feature requires optional dependencies "
-        "(yr, torch_npu). CPU-only paths can still work, but NPU transport "
-        "will be unavailable. Install with: pip install 'ray-ascend[yr]'",
+        "'torch_npu'. CPU-only paths can still work, but NPU transport "
+        "will be unavailable. Install with: 'pip install torch-npu'",
         RuntimeWarning,
     )
 
@@ -43,13 +52,18 @@ class BaseDSAdapter(ABC):
 
 class CPUClientAdapter(BaseDSAdapter):
     def __init__(self, host, port):
+        if KVClient is None:
+            raise RuntimeError(
+                "Missing optional dependency 'datasystem'. Install with: "
+                "'pip install openyuanrong-datasystem' to use CPUClientAdapter."
+            )
         self._client = KVClient(host=host, port=port)
 
     def init(self):
         self._client.init()
 
     def put(self, keys, tensors):
-        # TODO: Do zero-copy optimization laster.
+        # TODO: Do zero-copy optimization later.
         values = [pickle.dumps(t) for t in tensors]
         failed_keys = self._client.mset(keys=keys, vals=values)
         raise_if_failed(failed_keys, "put")
@@ -68,6 +82,12 @@ class CPUClientAdapter(BaseDSAdapter):
 
 class NPUClientAdapter(BaseDSAdapter):
     def __init__(self, host, port):
+        if DsTensorClient is None:
+            raise RuntimeError(
+                "Missing optional dependency 'datasystem' or NPU support. Install with: "
+                "'pip install torch-npu' and 'pip install openyuanrong-datasystem' "
+                "to ensure NPU support is available."
+            )
         self._client = DsTensorClient(
             host=host,
             port=port,
