@@ -9,14 +9,14 @@ from typing import Optional
 import ray
 import torch
 import yaml
-from direct_transport.conftest import (
-    start_datasystem,
-    start_etcd,
-)
 from omegaconf import OmegaConf
 from ray.experimental import register_tensor_transport
 
 from ray_ascend.direct_transport import YRTensorTransport
+from ray_ascend.utils import (
+    start_datasystem,
+    start_etcd,
+)
 
 register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
 
@@ -25,11 +25,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-########################################################################
-# Please set up Ray cluster before running this script
-########################################################################
-HEAD_NODE_IP = "NodeA"  # Replace with your head node IP
-WORKER_NODE_IP = "NodeB"  # Replace with your worker node IP
+
+HEAD_NODE_IP = "NodeA"
+WORKER_NODE_IP = "NodeB"
 
 
 # This is the Medium setting of the performance test.
@@ -72,7 +70,7 @@ def load_config_from_file(config_file: str) -> dict:
 
 
 # TODO: support more configurations (Currently only YR with NPU is supported) and config file parsing
-def parse_args() -> dict:
+def parse_args() -> argparse.Namespace:
     """
     The following parameters are not currently supported:
     transport
@@ -85,7 +83,6 @@ def parse_args() -> dict:
             "name": "--backend",
             "type": str,
             "choices": ["yr", "hccl"],
-            "required": True,
             "help": "Transport backend: 'yr' for YR Direct Transport, 'hccl' for HCCL.",
         },
         {
@@ -173,18 +170,22 @@ def parse_args() -> dict:
     # set defaults and parse final args
     parser.set_defaults(**config_defaults)
     final_args = parser.parse_args()
-
+    if final_args.backend is None:
+        parser.error("--backend is required")
     if final_args.placement == "remote":
         if not final_args.head_node_ip:
             parser.error("--head-node-ip is required when --placement=remote")
         if not final_args.worker_node_ip:
             parser.error("--worker-node-ip is required when --placement=remote")
-    
+        global HEAD_NODE_IP, WORKER_NODE_IP
+        HEAD_NODE_IP = final_args.head_node_ip
+        WORKER_NODE_IP = final_args.worker_node_ip
+
     logger.info(f"Test configuration:\n{OmegaConf.to_yaml(vars(final_args))}")
     return final_args
 
 
-def decorate_with_transport(transport_name):
+def decorate_with_transport():
     def decorator(cls):
         # Class decorator: start a single etcd for the tester instance
         orig_init = cls.__init__
@@ -239,7 +240,7 @@ def decorate_with_transport(transport_name):
 
 @ray.remote
 class DataSystemActor:
-    
+
     def __init__(self, etcd_addr: str, node_ip: Optional[str] = None):
         self.etcd_addr = etcd_addr
         self.node_ip = node_ip
@@ -247,7 +248,7 @@ class DataSystemActor:
         self.worker_port: Optional[int] = None
         self.ds_started = False
 
-    def start_datasystem(self) -> tuple[str, int]:
+    def start_datasystem(self):
         if self.ds_started:
             logger.warning("DataSystem already started")
             return self.worker_host, self.worker_port
@@ -259,7 +260,7 @@ class DataSystemActor:
                 self.worker_host, self.worker_port = start_datasystem(
                     self.etcd_addr, worker_host=self.node_ip
                 )
-            
+
             self.ds_started = True
             logger.info(f"DataSystem started at {self.worker_host}:{self.worker_port}")
             return self.worker_host, self.worker_port
@@ -279,13 +280,13 @@ class DataSystemActor:
                 "--worker_address",
                 f"{self.worker_host}:{self.worker_port}",
             ]
-            subprocess.run(ds_stop_cmd, check=True, timeout=180)
+            subprocess.run(ds_stop_cmd, check=True, timeout=90)
             self.ds_started = False
             logger.info("DataSystem stopped successfully")
         except Exception as e:
             logger.error(f"Failed to stop datasystem: {e}")
 
-    def get_datasystem_info(self) -> tuple[str, int]:
+    def get_datasystem_info(self) -> tuple[Optional[str], Optional[int]]:
         if not self.ds_started:
             raise RuntimeError("DataSystem not started yet")
         return self.worker_host, self.worker_port
@@ -293,14 +294,17 @@ class DataSystemActor:
 
 @ray.remote
 class TensorTransportActor:
-    
+
     def __init__(self, config, node_ip: Optional[str] = None):
         self.config = config
         self.node_ip = node_ip
         self.data: Optional[torch.Tensor] = None
-        self.ds_info: Optional[tuple[str, int]] = None
-        if os.getenv("YR_DS_WORKER_HOST") and os.getenv("YR_DS_WORKER_PORT"):
-            self.ds_info = (os.getenv("YR_DS_WORKER_HOST"), int(os.getenv("YR_DS_WORKER_PORT")))
+        self.ds_info: Optional[tuple[Optional[str], Optional[int]]] = None
+        host = os.getenv("YR_DS_WORKER_HOST")
+        port_str = os.getenv("YR_DS_WORKER_PORT")
+
+        if host and port_str:
+            self.ds_info = (host, int(port_str))
             logger.info(f"DataSystem info loaded from environment: {self.ds_info}")
         # TODO: enhance robustness of device setting
         torch.npu.set_device(0)
@@ -339,7 +343,7 @@ class HCCLTransportBandwidthTester:
     pass
 
 
-@decorate_with_transport("YR")
+@decorate_with_transport()
 class YRDirectTransportBandwidthTester:
     def __init__(self, config, remote_mode="local"):
         self.config = config
@@ -359,14 +363,18 @@ class YRDirectTransportBandwidthTester:
             self.worker_ds_actor = DataSystemActor.options(
                 resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
             ).remote(getattr(self, "_etcd_addr", None), node_ip=WORKER_NODE_IP)
-            self.worker_ds_info = ray.get(self.worker_ds_actor.start_datasystem.remote())
+            self.worker_ds_info = ray.get(
+                self.worker_ds_actor.start_datasystem.remote()
+            )
         else:
             logger.info("Initializing data system client in local mode...")
             logger.info(f"etcd address is {getattr(self, '_etcd_addr', None)}")
-            self.head_ds_actor = self.worker_ds_actor = DataSystemActor.options(resources={"NPU": 1}).remote(
-                getattr(self, "_etcd_addr", None)
+            self.head_ds_actor = self.worker_ds_actor = DataSystemActor.options(
+                resources={"NPU": 1}
+            ).remote(getattr(self, "_etcd_addr", None))
+            self.head_ds_info = self.worker_ds_info = ray.get(
+                self.head_ds_actor.start_datasystem.remote()
             )
-            self.head_ds_info = self.worker_ds_info = ray.get(self.head_ds_actor.start_datasystem.remote())
 
     def _initialize_test_actor(self):
         # TODO: support cpu transport test after YR transport supports cpu tensors
@@ -380,7 +388,7 @@ class YRDirectTransportBandwidthTester:
             reader_actor = TensorTransportActor.options(
                 resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, WORKER_NODE_IP)
-            
+
         else:
             logger.info("Initializing data system client in local mode...")
             logger.info(f"etcd address is {getattr(self, '_etcd_addr', None)}")
@@ -390,7 +398,7 @@ class YRDirectTransportBandwidthTester:
             reader_actor = TensorTransportActor.options(resources={"NPU": 1}).remote(
                 self.config
             )
-            
+
         ray.get(reader_actor.setup_yr_env.remote(self.worker_ds_info))
         ray.get(writer_actor.setup_yr_env.remote(self.head_ds_info))
         return writer_actor, reader_actor
@@ -422,7 +430,7 @@ class YRDirectTransportBandwidthTester:
         logger.info(f"Transport Throughput: {transport_throughput_gbps:.8f} Gb/s")
         time.sleep(2)
 
-        mode_name = "YR REMOTE" if self.remote_mode == "remote" else "YR NORMAL"
+        mode_name = f"{self.config.backend.upper()} {self.remote_mode.upper()}"
         logger.info("=" * 60)
         logger.info(f"{mode_name} BANDWIDTH TEST SUMMARY")
         logger.info("=" * 60)
@@ -435,9 +443,10 @@ class YRDirectTransportBandwidthTester:
 
     def close_datasystem(self):
         if self.head_ds_actor:
-             ray.get(self.head_ds_actor.stop_datasystem.remote())
+            ray.get(self.head_ds_actor.stop_datasystem.remote())
         if self.worker_ds_actor and self.worker_ds_actor != self.head_ds_actor:
             ray.get(self.worker_ds_actor.stop_datasystem.remote())
+
 
 def main():
     config = parse_args()
@@ -448,13 +457,16 @@ def main():
 
     if config.backend == "yr":
         tester = YRDirectTransportBandwidthTester(config, remote_mode=config.placement)
+    elif config.backend == "hccl":
+        raise NotImplementedError("HCCL transport test not implemented yet")
     else:
-        raise NotImplementedError(f"Unsupported backend: {config.backend}")
+        raise ValueError(f"Unsupported backend: {config.backend}")
 
     try:
         tester.run_bandwidth_test()
     finally:
-        tester.close_datasystem()
+        if config.backend == "yr":
+            tester.close_datasystem()
 
 
 if __name__ == "__main__":
