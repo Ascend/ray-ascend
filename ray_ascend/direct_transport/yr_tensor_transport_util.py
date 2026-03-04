@@ -3,8 +3,11 @@ import warnings
 
 try:
     from yr.datasystem import KVClient
+
+    YR_AVAILABLE = True
 except ImportError:
     KVClient = None
+    YR_AVAILABLE = False
     warnings.warn(
         "The 'yr_tensor_transport' feature requires optional dependencies"
         "'datasystem', Install with: 'pip install openyuanrong-datasystem'",
@@ -14,8 +17,11 @@ except ImportError:
 try:
     import torch_npu
     from yr.datasystem import DsTensorClient
+
+    NPU_AVAILABLE = True
 except ImportError:
     DsTensorClient = None
+    NPU_AVAILABLE = False
     warnings.warn(
         "The 'yr_tensor_transport' feature requires optional dependencies "
         "'torch_npu'. CPU-only paths can still work, but NPU transport "
@@ -52,7 +58,7 @@ class BaseDSAdapter(ABC):
 
 class CPUClientAdapter(BaseDSAdapter):
     def __init__(self, host, port):
-        if KVClient is None:
+        if not YR_AVAILABLE:
             raise RuntimeError(
                 "Missing optional dependency 'datasystem'. Install with: "
                 "'pip install openyuanrong-datasystem' to use CPUClientAdapter."
@@ -82,7 +88,7 @@ class CPUClientAdapter(BaseDSAdapter):
 
 class NPUClientAdapter(BaseDSAdapter):
     def __init__(self, host, port):
-        if DsTensorClient is None:
+        if not NPU_AVAILABLE:
             raise RuntimeError(
                 "Missing optional dependency 'datasystem' or NPU support. Install with: "
                 "'pip install torch-npu' and 'pip install openyuanrong-datasystem' "
