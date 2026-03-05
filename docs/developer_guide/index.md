@@ -1,4 +1,5 @@
 # Developer Guide
+> _last upated: 03/05/2026_
 
 ## Target
 This guide is intended for developers who wish to read, modify or expand the source code of this project.
