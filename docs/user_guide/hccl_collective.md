@@ -20,7 +20,7 @@ distributed collective operations across Ray actors.
 ```python
 import ray
 from ray.util import collective
-from ray_ascend.collective import HCCLGroup
+from ray_ascend.collective.hccl_collective_group import HCCLGroup
 
 # Initialize Ray
 ray.init()
@@ -80,7 +80,7 @@ You can also use Ray's high-level collective API:
 ```python
 import ray
 from ray.util import collective
-from ray_ascend.collective import HCCLGroup
+from ray_ascend.collective.hccl_collective_group import HCCLGroup
 
 ray.init()
 ray.register_collective_backend("HCCL", HCCLGroup)
