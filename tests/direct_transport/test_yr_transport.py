@@ -15,7 +15,7 @@ from ray_ascend.direct_transport.yr_tensor_transport import (
 @pytest.fixture(scope="module", autouse=True)
 def prepare_yr_env():
     os.environ["YR_DS_WORKER_HOST"] = "127.0.0.1"
-    os.environ["YR_DS_WORKER_PORT"] = "31501"
+    os.environ["YR_DS_WORKER_PORT"] = "31502"
 
 
 @pytest.fixture(params=["cpu", "npu"])
@@ -68,14 +68,26 @@ def mock_client(device_case):
 @pytest.fixture
 def patch_client(device_case, mock_client):
     """Patch the correct client constructor inside YRTensorTransport."""
-    path = (
-        "ray_ascend.direct_transport.yr_tensor_transport_util.KVClient"
-        if device_case == "cpu"
-        else "ray_ascend.direct_transport.yr_tensor_transport_util.DsTensorClient"
-    )
-
-    with patch(path, return_value=mock_client):
-        yield
+    if device_case == "cpu":
+        with patch(
+            "ray_ascend.direct_transport.yr_tensor_transport_util.KVClient",
+            return_value=mock_client,
+        ):
+            with patch(
+                "ray_ascend.direct_transport.yr_tensor_transport_util.YR_AVAILABLE",
+                True,
+            ):
+                yield
+    else:
+        with patch(
+            "ray_ascend.direct_transport.yr_tensor_transport_util.DsTensorClient",
+            return_value=mock_client,
+        ):
+            with patch(
+                "ray_ascend.direct_transport.yr_tensor_transport_util.NPU_AVAILABLE",
+                True,
+            ):
+                yield
 
 
 def test_metadata_flow(device_case, tensors, mock_client, patch_client):
