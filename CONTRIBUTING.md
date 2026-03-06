@@ -1,16 +1,17 @@
 # Contributing to ray-ascend
 
-Thank you for your interest in contributing to ray-ascend! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to ray-ascend! This document provides
+guidelines and instructions for contributing to the project.
 
 ## Getting Started
 
 1. Fork the repository on GitHub
-2. Clone your fork locally:
+1. Clone your fork locally:
    ```bash
    git clone https://gitcode.com/YOUR_USERNAME/ray-ascend.git
    cd ray-ascend
    ```
-3. Add the upstream repository:
+1. Add the upstream repository:
    ```bash
    git remote add upstream https://gitcode.com/Ascend/ray-ascend.git
    ```
@@ -18,17 +19,20 @@ Thank you for your interest in contributing to ray-ascend! This document provide
 ## Development Setup
 
 1. Create a virtual environment:
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-2. Install the package in development mode:
+1. Install the package in development mode:
+
    ```bash
    pip install -e .
    ```
 
-3. Install pre-commit hooks:
+1. Install pre-commit hooks:
+
    ```bash
    pip install pre-commit
    pre-commit install
@@ -37,22 +41,25 @@ Thank you for your interest in contributing to ray-ascend! This document provide
 ## Making Changes
 
 1. Create a new branch for your changes:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
-2. Make your changes and commit them:
+1. Make your changes and commit them:
+
    ```bash
    git add .
    git commit -m "Description of your changes"
    ```
 
-3. Push your changes to your fork:
+1. Push your changes to your fork:
+
    ```bash
    git push origin feature/your-feature-name
    ```
 
-4. Open a pull request on GitHub
+1. Open a pull request on GitHub
 
 ## Code Style
 
@@ -63,7 +70,8 @@ This project uses the following tools to maintain code quality:
 - **flake8**: Linting
 - **mypy**: Type checking
 
-Pre-commit hooks will automatically run these tools before each commit. You can also run them manually:
+Pre-commit hooks will automatically run these tools before each commit. You can also run
+them manually:
 
 ```bash
 # Format code
@@ -84,10 +92,11 @@ mypy .
 Before submitting a pull request, please ensure that:
 
 1. All existing tests pass
-2. New features include appropriate tests
-3. Code coverage is maintained or improved
+1. New features include appropriate tests
+1. Code coverage is maintained or improved
 
 Run tests with:
+
 ```bash
 pytest
 ```
