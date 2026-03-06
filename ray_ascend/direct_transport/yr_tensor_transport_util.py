@@ -15,7 +15,7 @@ except ImportError:
     )
 
 try:
-    import torch_npu
+    import torch_npu  # noqa: F401
     from yr.datasystem import DsTensorClient
 
     NPU_AVAILABLE = True
