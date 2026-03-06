@@ -14,16 +14,24 @@ Ray Ascend Plugin
 
 ## Overview
 
-`ray-ascend` is a community maintained hardware plugin to support advanced [Ray](https://github.com/ray-project/ray) features on Ascend NPU accelerators.
+`ray-ascend` is a community maintained hardware plugin to support advanced
+[Ray](https://github.com/ray-project/ray) features on Ascend NPU accelerators.
 
-The default ray natively supports Ascend NPU as a pre-defined resource type to bind actors and tasks (see [ray accelerator support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html#id1)). As an enhancement, `ray-ascend` provides Ascend-native features on ray, such as collective communication [Huawei Collective Communication Library (HCCL)](https://www.hiascend.com/document/detail/zh/canncommercial/850/commlib/hcclug/hcclug_000001.html), [Ray Direct Transport (RDT)](https://docs.ray.io/en/latest/ray-core/direct-transport.html), etc.
+The default ray natively supports Ascend NPU as a pre-defined resource type to bind
+actors and tasks (see
+[ray accelerator support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html#id1)).
+As an enhancement, `ray-ascend` provides Ascend-native features on ray, such as
+collective communication
+[Huawei Collective Communication Library (HCCL)](https://www.hiascend.com/document/detail/zh/canncommercial/850/commlib/hcclug/hcclug_000001.html),
+[Ray Direct Transport (RDT)](https://docs.ray.io/en/latest/ray-core/direct-transport.html),
+etc.
 
 ## Prerequisites
 
 - Architecture: aarch64, x86
 - OS kernel: linux
 - Python dependencies
-  - python>=3.10, <=3.11
+  - python>=3.10, \<=3.11
   - CANN==8.2.rc1
   - torch==2.7.1, torch-npu==2.7.1.post1
   - ray (the same version as ray-ascend)
@@ -33,7 +41,6 @@ The default ray natively supports Ascend NPU as a pre-defined resource type to b
 | Version   | Release type             | Doc |
 | --------- | ------------------------ | --- |
 | 0.54.0rc1 | Latest release candidate |     |
-
 
 ## Quick start
 
@@ -97,7 +104,9 @@ ray.get(result)
 
 ### Transport Ascend NPU tensors via [HCCS](https://www.hiascend.com/document/detail/zh/Glossary/gls/gls_0001.html#ZH-CN_TOPIC_0000002210355753__section665813471086) and CPU tensors via RDMA
 
-[openYuanrong-datasystem](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/index.html) (`YR`) allows users to transport NPU tensors (via HCCS) and CPU tensors (via RDMA if provided) by ray objects.
+[openYuanrong-datasystem](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/index.html)
+(`YR`) allows users to transport NPU tensors (via HCCS) and CPU tensors (via RDMA if
+provided) by ray objects.
 
 ```python
 import ray
@@ -122,7 +131,10 @@ cpu_tensor = ray.get(sender.transfer_cpu_tensor_via_rdma())
 
 ## Contributing
 
-See [CONTRIBUTING](./CONTRIBUTING.md) for more details, which is a step-by-step guide to help you set up development environment, build and test. Please let us know if you find a bug or request a feature by [filing an issue](https://github.com/Ascend/ray-ascend/issues).
+See [CONTRIBUTING](./CONTRIBUTING.md) for more details, which is a step-by-step guide to
+help you set up development environment, build and test. Please let us know if you find
+a bug or request a feature by
+[filing an issue](https://github.com/Ascend/ray-ascend/issues).
 
 ## License
 

@@ -1,6 +1,7 @@
 # Ray Ascend Plugin documents
 
 ## Build the docs
+
 ```bash
 # Install the dependencies
 pip install -r docs/requirements-docs.txt
@@ -15,4 +16,5 @@ mkdocs serve -f docs/mkdocs.yml
 ```
 
 Launch your browser and open:
+
 - English version: https://127.0.0.1:8000
