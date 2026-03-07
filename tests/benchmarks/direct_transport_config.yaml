@@ -1,0 +1,7 @@
+backend: yr
+placement: remote
+device: npu
+head_node_ip: "10.170.27.24"
+worker_node_ip: "10.170.27.33"
+tensor_size: 4096
+warmup_times: 0
