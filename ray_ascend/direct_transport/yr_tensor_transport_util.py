@@ -68,15 +68,75 @@ class CPUClientAdapter(BaseDSAdapter):
     def init(self):
         self._client.init()
 
-    def put(self, keys, tensors):
-        # TODO: Do zero-copy optimization later.
-        values = [pickle.dumps(t) for t in tensors]
-        failed_keys = self._client.mset(keys=keys, vals=values)
-        raise_if_failed(failed_keys, "put")
+    def _serialize_tensor_with_pickler(self, tensor: torch.Tensor):
+        """使用 Pickler 实例进行序列化"""
+        # 显式转换非连续 Tensor，确保 buffer_callback 只触发一次
+        if not tensor.is_contiguous():
+            tensor = tensor.contiguous()
+            
+        oob_buffers = []
+        stream = io.BytesIO()
+        
+        # 实例化 Pickler
+        # buffer_callback: 当发现支持 Buffer 协议的大块内存时触发
+        pickler = pickle.Pickler(
+            stream, 
+            protocol=5, 
+            buffer_callback=lambda b: oob_buffers.append(b.raw())
+        )
+        pickler.dump(tensor)
+        
+        skeleton = stream.getvalue()
+        raw_data = oob_buffers[0] # 对于连续 Tensor，必只有一个
+        
+        total_size = 4 + len(skeleton) + raw_data.nbytes
+        return skeleton, raw_data, total_size
 
-    def get(self, keys, tensors):
-        raw_tensors = self._client.get(keys=keys)
-        tensors[:] = [pickle.loads(r) for r in raw_tensors]
+    def put(self, keys: list[str], objs: list[torch.Tensor]):
+        # 1. 序列化提取元数据
+        serialized_results = [self._serialize_tensor_with_pickler(obj) for obj in objs]
+        packed_sizes = [res[2] for res in serialized_results]
+
+        # 2. 申请共享内存
+        ds_buffers = self._ds_client.mcreate(keys, packed_sizes)
+
+        # 3. 填充数据 (保持之前的逻辑)
+        def _pack_one(target_ds_val, res):
+            skeleton, raw_data, _ = res
+            target_mv = target_ds_val.MutableData()
+            skel_len = len(skeleton)
+            
+            # [4字节长度 | 骨架字节 | 原始数据]
+            struct.pack_into("<I", target_mv, 0, skel_len)
+            target_mv[4 : 4 + skel_len] = skeleton
+            
+            offset = 4 + skel_len
+            # 使用 torch 快速搬运
+            target_tensor = torch.frombuffer(target_mv, dtype=torch.uint8)
+            src_tensor = torch.frombuffer(raw_data, dtype=torch.uint8)
+            target_tensor[offset : offset + raw_data.nbytes].copy_(src_tensor)
+
+        with ThreadPoolExecutor(max_workers=self.DS_MAX_WORKERS) as executor:
+            list(executor.map(lambda p: _pack_one(*p), zip(ds_buffers, serialized_results)))
+
+        self._ds_client.mset_buffer(ds_buffers)
+
+    # 接收端的逻辑依然可以保持简洁
+    def get(self, keys: list[str]) -> list[torch.Tensor]:
+        buffers = self._ds_client.get_buffers(keys)
+        results = []
+        for buf in buffers:
+            if buf is None:
+                results.append(None)
+                continue
+            mv = memoryview(buf)
+            skel_len = struct.unpack_from("<I", mv, 0)[0]
+            skeleton = mv[4 : 4 + skel_len]
+            payload = mv[4 + skel_len:]
+            
+            # 这里直接用 loads 即可，它底层会自动创建 Unpickler
+            results.append(pickle.loads(skeleton, buffers=[payload]))
+        return results
 
     def delete(self, keys):
         failed_keys = self._client.delete(keys=keys)
