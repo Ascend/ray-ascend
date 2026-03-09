@@ -14,43 +14,43 @@ Ray Ascend Plugin
 
 ## Overview
 
-`ray-ascend` is a community maintained hardware plugin to support advanced
+`ray-ascend` is a community-maintained hardware plugin that supports advanced
 [Ray](https://github.com/ray-project/ray) features on Ascend NPU accelerators.
 
-The default ray natively supports Ascend NPU as a pre-defined resource type to bind
+By default, Ray natively supports Ascend NPU as a predefined resource type for binding
 actors and tasks (see
-[ray accelerator support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html#id1)).
-As an enhancement, `ray-ascend` provides Ascend-native features on ray, such as
-collective communication
+[Ray Accelerator Support](https://docs.ray.io/en/latest/ray-core/scheduling/accelerators.html#id1)).
+As an enhancement, `ray-ascend` provides Ascend-native features on Ray, such as
+collective communication via
 [Huawei Collective Communication Library (HCCL)](https://www.hiascend.com/document/detail/zh/canncommercial/850/commlib/hcclug/hcclug_000001.html),
 [Ray Direct Transport (RDT)](https://docs.ray.io/en/latest/ray-core/direct-transport.html),
-etc.
+and more.
 
 ## Prerequisites
 
-- Architecture: aarch64, x86
-- OS kernel: linux
-- Python dependencies
-  - python>=3.10, \<=3.11
-  - CANN==8.2.rc1
-  - torch==2.7.1, torch-npu==2.7.1.post1
-  - ray (the same version as ray-ascend)
+- **Architecture**: aarch64, x86
+- **OS Kernel**: Linux
+- **Python Dependencies**:
+  - python >= 3.10, <= 3.11
+  - CANN == 8.2.rc1
+  - torch == 2.7.1, torch-npu == 2.7.1.post1
+  - Ray (same version as ray-ascend)
 
 ## Version
 
-| Version   | Release type             | Doc |
+| Version   | Release Type             | Doc |
 | --------- | ------------------------ | --- |
-| 0.54.0rc1 | Latest release candidate |     |
+| 0.54.0rc1 | Latest Release Candidate |     |
 
-## Quick start
+## Quick Start
 
 ### Installation
 
 ```python
-pip install ray-ascend[yr]
+pip install "ray-ascend[yr]"
 ```
 
-### HCCL collective communication among ray actors
+### HCCL Collective Communication Among Ray Actors
 
 ```python
 import ray
@@ -67,11 +67,11 @@ collective.create_collective_group(
     group_name="my_group",
 )
 
-# each actor broadcast in a spmd manner
+# Each actor broadcasts in SPMD manner
 collective.broadcast(tensor, src_rank=0, group_name="my_group")
 ```
 
-### Transport Ascend NPU tensors via [HCCS](https://www.hiascend.com/document/detail/zh/Glossary/gls/gls_0001.html#ZH-CN_TOPIC_0000002210355753__section665813471086)
+### Transport Ascend NPU Tensors via [HCCS](https://www.hiascend.com/document/detail/zh/Glossary/gls/gls_0001.html#ZH-CN_TOPIC_0000002210355753__section665813471086)
 
 ```python
 import ray
@@ -102,11 +102,11 @@ result = receiver.sum.remote(tensor)
 ray.get(result)
 ```
 
-### Transport Ascend NPU tensors via [HCCS](https://www.hiascend.com/document/detail/zh/Glossary/gls/gls_0001.html#ZH-CN_TOPIC_0000002210355753__section665813471086) and CPU tensors via RDMA
+### Transport Ascend NPU Tensors via [HCCS](https://www.hiascend.com/document/detail/zh/Glossary/gls/gls_0001.html#ZH-CN_TOPIC_0000002210355753__section665813471086) and CPU Tensors via RDMA
 
-[openYuanrong-datasystem](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/index.html)
+[OpenYuanRong DataSystem](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/index.html)
 (`YR`) allows users to transport NPU tensors (via HCCS) and CPU tensors (via RDMA if
-provided) by ray objects.
+provided) using Ray objects.
 
 ```python
 import ray
@@ -131,8 +131,8 @@ cpu_tensor = ray.get(sender.transfer_cpu_tensor_via_rdma())
 
 ## Contributing
 
-See [CONTRIBUTING](./CONTRIBUTING.md) for more details, which is a step-by-step guide to
-help you set up development environment, build and test. Please let us know if you find
+See [CONTRIBUTING](./CONTRIBUTING.md) for more details—a step-by-step guide to help
+you set up your development environment, build, and test. Please let us know if you find
 a bug or request a feature by
 [filing an issue](https://github.com/Ascend/ray-ascend/issues).
 
