@@ -1,6 +1,6 @@
 # Developer Guide
 
-> _last upated: 03/06/2026_
+> _Last upated: 03/09/2026_
 
 ## Target
 
@@ -21,8 +21,6 @@ environment to submitting a pull request.
 1. ✅ [Submit Contribution](#submit-your-contribution) - Sign CLA and create a pull
    request
 
-______________________________________________________________________
-
 ## Preparation
 
 Before starting development, you need to set up your environment. Refer to
@@ -42,8 +40,6 @@ Before starting development, you need to set up your environment. Refer to
 See [Setup Guide](setup.md#install-ray-ascend-without-yr) for complete installation
 instructions.
 
-______________________________________________________________________
-
 ## Clone & Install
 
 ```bash
@@ -57,8 +53,6 @@ pip install -e .
 # Or for full development with all features
 pip install -e ".[all]"
 ```
-
-______________________________________________________________________
 
 ## Code Structure
 
@@ -81,8 +75,6 @@ tests/
 - **collective/**: HCCL-based collective communication group implementation
 - **direct_transport/**: YuanRong direct tensor transport implementation
 - **tests/**: Comprehensive test suite using pytest
-
-______________________________________________________________________
 
 ## Coding Standards and Submission
 
@@ -109,8 +101,6 @@ Before committing your code:
 For complete information on code style, pre-commit setup, and contribution guidelines,
 refer to [Contributing Guide](contributing.md#instructions-for-contribution).
 
-______________________________________________________________________
-
 ## Build and Test
 
 Run tests using pytest to ensure your changes don't break existing functionality:
@@ -125,8 +115,6 @@ pytest -v
 
 All tests must pass before submitting a PR. For more testing details and options, see
 [Contributing Guide](contributing.md#run-tests).
-
-______________________________________________________________________
 
 ## Submit Your Contribution
 
@@ -204,22 +192,16 @@ Before submitting, ensure:
 - ✅ CLA is signed (first-time contributors)
 - ✅ Commit email matches CLA email
 
-______________________________________________________________________
-
 ## Documentation
 
 Documentation updates should be made to the relevant `.md` files in the `docs/`
 directory. Use clear, concise language with code examples where appropriate.
-
-______________________________________________________________________
 
 ## Additional Resources
 
 - [Setup Guide](setup.md) - Detailed environment setup instructions
 - [Contributing Guide](contributing.md) - Contribution workflow and guidelines
 - [Main README](../../README.md) - Project overview and getting started
-
-______________________________________________________________________
 
 ## Getting Help
 

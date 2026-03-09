@@ -1,5 +1,7 @@
 # Setup
 
+> _Last upated: 03/09/2026_
+
 We provide installation instructions for YuanRong direct transport and HCCL collective
 group, and you can selectively install the relevant dependencies as needed.
 
@@ -12,26 +14,36 @@ or **HCCL**, you need to install **Ascend-cann-toolkit**.
 > architecture launched by Huawei for AI scenarios. \
 > HCCL(Huawei Collective Communication Library) is included in CANN.
 
-We recommend developers to develop inside CANN container like:
+We recommend developers to develop inside CANN container.
+
+First, please select the appropriate
+[CANN image](https://hub.docker.com/r/ascendai/cann) (align to your **cann
+version**/**ascend hardware**/**os**/**python version**) and pull it.
+
+______________________________________________________________________
+
+| CANN Version | Ascend Hardware | OS           | Python Version | Image Name                           |
+| ------------ | --------------- | ------------ | -------------- | ------------------------------------ |
+| 8.2.rc1      | A3              | Ubuntu 22.04 | 3.11           | cann:8.2.rc1-a3-ubuntu22.04-py3.11   |
+| 8.2.rc1      | 910B            | Ubuntu 22.04 | 3.11           | cann:8.2.rc1-910b-ubuntu22.04-py3.11 |
+
+______________________________________________________________________
 
 ```bash
-# pull CANN container
+docker pull swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/${image name}
+# for example, pull CANN container on NPU A3 machines
 docker pull swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:8.2.rc1-a3-ubuntu22.04-py3.11
+# for NPU 910B machines
+docker pull swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:8.2.rc1-910b-ubuntu22.04-py3.11
 ```
 
 To run a container based on this image, please refer to
-[offical cann image documentations](https://github.com/Ascend/cann-container-image).
+[offical cann image documentations](https://github.com/Ascend/cann-container-image?tab=readme-ov-file#usage).
 
 After CANN installation, confirm the toolkit path exists:
 
 ```bash
 ls /usr/local/Ascend/ascend-toolkit/latest
-```
-
-Set environment:
-
-```bash
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
 ```
 
 ## Install ray-ascend without yr

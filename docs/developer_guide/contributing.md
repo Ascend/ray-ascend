@@ -1,5 +1,7 @@
 # Contributing
 
+> _Last upated: 03/09/2026_
+
 ## Instructions for Contribution
 
 ### Install pre-commit
@@ -78,7 +80,3 @@ pytest -v
 When you submit your PR for the first time, please sign the Ascend
 [CLA ( Contributor License Agreement )](https://clasign.osinfra.cn/sign/690ca9ddf91c03dee6082ab1).
 The email address used to sign the CLA must match the commit signature.
-
-## A new ccl
-
-## A new transport
