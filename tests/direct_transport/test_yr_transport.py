@@ -1,5 +1,5 @@
+# Todo: re-adjust the unit tests.
 import os
-import pickle
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -54,9 +54,16 @@ def mock_client(device_case):
     client.init.return_value = None
 
     if device_case == "cpu":
-        client.mset.return_value = None
-        client.get.return_value = []
-        client.delete.return_value = None
+        client.mcreate.return_value = [
+            MagicMock(),
+            MagicMock(),
+        ]
+        client.mset_buffer.return_value = None
+        client.get_buffers.return_value = [
+            b"fake_buffer_data_1",
+            b"fake_buffer_data_2",
+        ]
+        client.delete.return_value = []
     else:
         client.dev_mset.return_value = None
         client.dev_mget.return_value = None
@@ -67,31 +74,57 @@ def mock_client(device_case):
 
 @pytest.fixture
 def patch_client(device_case, mock_client):
-    """Patch the correct client constructor inside YRTensorTransport."""
+    """Patch client and encoders/decoders for CPU only."""
     if device_case == "cpu":
-        with patch(
-            "ray_ascend.direct_transport.yr_tensor_transport_util.KVClient",
-            return_value=mock_client,
-        ):
-            with patch(
+        with (
+            patch(
+                "ray_ascend.direct_transport.yr_tensor_transport_util.KVClient",
+                return_value=mock_client,
+            ),
+            patch(
                 "ray_ascend.direct_transport.yr_tensor_transport_util.YR_AVAILABLE",
                 True,
-            ):
-                yield
-    else:
-        with patch(
-            "ray_ascend.direct_transport.yr_tensor_transport_util.DsTensorClient",
-            return_value=mock_client,
+            ),
         ):
-            with patch(
+            with (
+                patch(
+                    "ray_ascend.direct_transport.yr_tensor_transport_util._encoder"
+                ) as mock_encoder,
+                patch(
+                    "ray_ascend.direct_transport.yr_tensor_transport_util._decoder"
+                ) as mock_decoder,
+                patch(
+                    "ray_ascend.direct_transport.yr_tensor_transport_util.CPUClientAdapter.pack_into"
+                ),
+                patch(
+                    "ray_ascend.direct_transport.yr_tensor_transport_util.CPUClientAdapter.unpack_from",
+                    return_value=[
+                        b"decoded_mock_data"
+                    ],  # Mock unpack_from to return something
+                ),
+            ):
+
+                mock_encoder.encode.return_value = [b"mock_meta", b"mock_raw_data"]
+                mock_decoder.decode.return_value = torch.tensor([1.0, 2.0, 3.0])
+
+                yield mock_encoder, mock_decoder, mock_client
+    else:
+        with (
+            patch(
+                "ray_ascend.direct_transport.yr_tensor_transport_util.DsTensorClient",
+                return_value=mock_client,
+            ),
+            patch(
                 "ray_ascend.direct_transport.yr_tensor_transport_util.NPU_AVAILABLE",
                 True,
-            ):
-                yield
+            ),
+        ):
+            yield None, None, mock_client
 
 
-def test_metadata_flow(device_case, tensors, mock_client, patch_client):
+def test_metadata_flow(device_case, tensors, patch_client):
     """Verify metadata extraction and backend mset invocation."""
+    mock_encoder, mock_decoder, mock_client = patch_client
     transport = YRTensorTransport()
 
     meta = transport.extract_tensor_transport_metadata(
@@ -105,17 +138,18 @@ def test_metadata_flow(device_case, tensors, mock_client, patch_client):
     assert isinstance(meta.ds_serialized_keys, (bytes, bytearray))
 
     if device_case == "cpu":
-        mock_client.mset.assert_called_once()
+        mock_client.mcreate.assert_called_once()
+        mock_client.mset_buffer.assert_called_once()
     else:
         mock_client.dev_mset.assert_called_once()
 
     mock_client.init.assert_called_once()
 
 
-def test_recv_multiple_tensors(device_case, tensors, mock_client, patch_client):
+def test_recv_multiple_tensors(device_case, tensors, patch_client):
     """Verify tensor reconstruction and correct backend get path."""
+    mock_encoder, mock_decoder, mock_client = patch_client
     transport = YRTensorTransport()
-    mock_client.get.return_value = [pickle.dumps(tensor) for tensor in tensors]
 
     meta = transport.extract_tensor_transport_metadata(
         obj_id="obj1",
@@ -133,18 +167,18 @@ def test_recv_multiple_tensors(device_case, tensors, mock_client, patch_client):
     assert len(out) == len(tensors)
 
     if device_case == "cpu":
-        mock_client.get.assert_called_once()
+        assert mock_decoder.decode.call_count > 0
+        mock_client.get_buffers.assert_called_once()
         mock_client.dev_mget.assert_not_called()
     else:
         mock_client.dev_mget.assert_called_once()
-        mock_client.get.assert_not_called()
+        mock_client.get_buffers.assert_not_called()
 
 
-def test_garbage_collect(device_case, tensors, mock_client, patch_client):
+def test_garbage_collect(device_case, tensors, patch_client):
     """Verify backend cleanup is called correctly per device."""
+    mock_encoder, mock_decoder, mock_client = patch_client
     transport = YRTensorTransport()
-
-    mock_client.get.return_value = [pickle.dumps(t) for t in tensors]
 
     meta = transport.extract_tensor_transport_metadata(
         obj_id="obj1",
@@ -162,7 +196,7 @@ def test_garbage_collect(device_case, tensors, mock_client, patch_client):
         mock_client.dev_delete.assert_called_once()
 
 
-def test_actor_has_tensor_transport(device_case, mock_client, patch_client):
+def test_actor_has_tensor_transport(device_case, patch_client):
     """
     Tests that actor_has_tensor_transport returns True when the remote health check succeeds.
     """
