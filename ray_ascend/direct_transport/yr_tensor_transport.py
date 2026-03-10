@@ -70,7 +70,7 @@ class YRTensorTransport(TensorTransportManager):
         port = os.getenv("YR_DS_WORKER_PORT")
         if not self._ds_worker_host or not port:
             raise RuntimeError(
-                "Yuanrong datasystem worker env not set. "
+                "YuanRong datasystem worker env not set. "
                 "Please set YR_DS_WORKER_HOST and YR_DS_WORKER_PORT."
             )
         self._ds_worker_port = int(port)
@@ -89,14 +89,14 @@ class YRTensorTransport(TensorTransportManager):
                 )
             self._ds_client[device_type].init()
             logger.info(
-                f"Succeed to initialize Yuanrong Datasystem client for "
+                f"Succeed to initialize YuanRong Datasystem client for "
                 f"device type {device_type} "
                 f"at {self._ds_worker_host}:{self._ds_worker_port}"
             )
         except Exception as e:
             self._ds_client.pop(device_type, None)
             raise RuntimeError(
-                f"Failed to initialize Yuanrong Datasystem client at"
+                f"Failed to initialize YuanRong Datasystem client at"
                 f"{self._ds_worker_host}:{self._ds_worker_port}. "
                 f"Error: {e}"
             ) from e
@@ -255,4 +255,4 @@ class YRTensorTransport(TensorTransportManager):
         obj_id: str,
         communicator_metadata: CommunicatorMetadata,
     ):
-        raise NotImplementedError("Yuanrong transport does not support aborting.")
+        raise NotImplementedError("YuanRong transport does not support aborting.")
