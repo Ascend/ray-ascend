@@ -20,5 +20,5 @@ This documentation is divided into two parts:
 - **[Developer Guide](developer_guide/index.md)**: For contributors who want to
   understand, extend, or debug the codebase.
 
-> **Note**: This project assumes you have a working Ascend (e.g., Atlas 900) environment
+> **Note**: This project assumes you have a working Ascend environment (e.g., Atlas 900)
 > with CANN installed.

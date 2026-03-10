@@ -2,7 +2,7 @@
 
 ## Target
 
-This guide is intended for the end users (or integrators) who are using the functions of
+This guide is intended for end users and integrators who want to use the features of
 this project.
 
 ## Install

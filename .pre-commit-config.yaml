@@ -36,8 +36,10 @@ repos:
     rev: 0.7.22
     hooks:
       - id: mdformat
+        files: ^docs/
         additional_dependencies:
           - mdformat-gfm
           - mdformat-tables
           - mdformat-frontmatter
-        args: [--wrap, "88"]
+          - mdformat-mkdocs
+        args: [--wrap, "88", "--align-semantic-breaks-in-lists"]

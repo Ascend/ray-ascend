@@ -1,13 +1,13 @@
 # Contributing
 
-> _Last upated: 03/09/2026_
+> _Last updated: 03/09/2026_
 
-## Instructions for Contribution
+## Contribution Guidelines
 
-### Install pre-commit
+### Install Pre-Commit
 
-`pre-commit` can automatically run various checks and fix tools before code is
-committed, ensuring code quality and consistency.
+`pre-commit` automatically runs various checks and fixes before code is committed,
+ensuring code quality and consistency.
 
 ```bash
 # cd ray-ascend and launch pre-commit
@@ -22,11 +22,11 @@ git config user.email "your.email@example.com"
 git commit -s
 ```
 
-For details about code style, please refer to the following:
+For detailed coding guidelines, please refer to the following:
 
 #### Code style
 
-Class naming style uses upper camelCase, for examples:
+Class names should use UpperCamelCase, as in these examples:
 
 ```python
 class HCCLRootInfoStore:
@@ -35,7 +35,7 @@ class YRTensorTransport:
     ...
 ```
 
-Local variables and methods use snake_case, for examples:
+Local variables and methods should use snake_case, as shown here:
 
 ```python
 def get_communicator_metadata():
@@ -46,14 +46,15 @@ class MyCollectiveGroup:
         ...
 ```
 
-Global variables and environment variables use upper snake_case, for examples:
+Global variables and environment variables should use UPPER_SNAKE_CASE, as in these
+examples:
 
 ```python
 YR_DS_WORKER_HOST
 YR_DS_WORKER_PORT
 ```
 
-When you define a Python method, please add a type annotation like:
+When defining a Python method, please add type annotations as follows:
 
 ```python
 def extract_tensor_transport_metadata(
@@ -64,10 +65,10 @@ def extract_tensor_transport_metadata(
     ...
 ```
 
-## Run tests
+## Running Tests
 
-All tests programs are located in the `tests/` directory and are written based on the
-pytest framework.
+All test programs are located in the `tests/` directory and are built on the pytest
+framework.
 
 ```bash
 # run tests
@@ -75,8 +76,8 @@ pip install -e ".[all]"
 pytest -v
 ```
 
-## Sign Ascend CLA
+## Sign the Ascend CLA
 
-When you submit your PR for the first time, please sign the Ascend
-[CLA ( Contributor License Agreement )](https://clasign.osinfra.cn/sign/690ca9ddf91c03dee6082ab1).
-The email address used to sign the CLA must match the commit signature.
+When submitting a PR for the first time, please sign the Ascend
+[CLA (Contributor License Agreement)](https://clasign.osinfra.cn/sign/690ca9ddf91c03dee6082ab1).
+The email address used to sign the CLA must match your Git commit signature.

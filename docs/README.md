@@ -8,10 +8,10 @@ pip install -r docs/requirements-docs.txt
 
 # Build the docs
 # Generate deployable static websites and PDFs in the `site/` directory.
-mkdocs build -f docs/mkdocs.yml
+mkdocs build -f mkdocs.yml
 
 # Open the docs with your browser
-mkdocs serve -f docs/mkdocs.yml
+mkdocs serve -f mkdocs.yml
 
 ```
 

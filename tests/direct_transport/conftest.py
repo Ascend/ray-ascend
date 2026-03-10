@@ -123,7 +123,7 @@ def start_datasystem(
     worker_port: Optional[int] = None,
     max_retries: int = 3,
 ):
-    """Start yuanrong datasystem worker via dscli and verify success by checking '[  OK  ]' in output."""
+    """Start YuanRong datasystem worker via dscli and verify success by checking '[  OK  ]' in output."""
     for attempt in range(max_retries):
 
         worker_port_ = worker_port if worker_port is not None else get_free_port()
@@ -167,7 +167,7 @@ def start_etcd_and_yr():
     Yields (worker_host, worker_port).
     """
     if not YR_AVAILABLE:
-        pytest.skip("yr library (yuanrong) not available, skipping YR tests")
+        pytest.skip("yr library (YuanRong) not available, skipping YR tests")
     if not check_dscli_available():
         pytest.skip("dscli tool not available, skipping YR tests")
 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     logger.info(f"etcd's address is: {etcd_addr}")
 
     worker_host, worker_port = start_datasystem(etcd_addr)
-    logger.info(f"Yuanrong datasystem worker's address is: {worker_host}:{worker_port}")
+    logger.info(f"YuanRong datasystem worker's address is: {worker_host}:{worker_port}")
 
     ds_client = datasystem.KVClient(worker_host, worker_port)
     ds_client.init()
