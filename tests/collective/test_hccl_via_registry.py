@@ -1,26 +1,34 @@
 import pytest
 import ray
 import torch
-from ray.util.collective.types import (
-    AllGatherOptions,
-    BroadcastOptions,
-    RecvOptions,
-    ReduceOp,
-    ReduceOptions,
-    ReduceScatterOptions,
-    SendOptions,
+from ray.experimental.collective import create_collective_group
+from ray.util.collective import (
+    allgather,
+    allreduce,
+    broadcast,
+    recv,
+    reduce,
+    reducescatter,
+    send,
 )
+from ray.util.collective.types import ReduceOp
 
-from ray_ascend.collective.hccl_collective_group import HCCLGroup
+from ray_ascend import register_hccl_collective_backend
 
 
 @pytest.fixture(scope="session")
 def actors(ray_cluster_with_npu):
     world_size = 2
     group_name = "hccl_group"
-    actors = [
-        HCCLTestActor.remote(rank, world_size, group_name) for rank in range(world_size)
-    ]
+    actors = [HCCLRegistryTestActor.remote(group_name) for _ in range(world_size)]
+
+    # Create collective group using Ray's experimental interface
+    create_collective_group(
+        actors=actors,
+        backend="HCCL",
+        name=group_name,
+    )
+
     yield actors
 
     for actor in actors:
@@ -32,82 +40,74 @@ def actors(ray_cluster_with_npu):
 
 
 @ray.remote(resources={"NPU": 1})
-class HCCLTestActor:
-    def __init__(self, rank, world_size, group_name="test_group"):
-        self.rank = rank
-        self.world_size = world_size
-        self.group = HCCLGroup(world_size, rank, group_name)
+class HCCLRegistryTestActor:
+    def __init__(self, group_name):
+        register_hccl_collective_backend()
+        self.group_name = group_name
 
     def destroy(self):
-        self.group.destroy_group()
+        pass
 
     def get_rank(self):
-        return self.rank
+        return ray.get_gpu_ids()[0] if ray.get_gpu_ids() else None
 
     def test_allreduce(self, tensor_data):
         """Test allreduce operation."""
-        tensor = torch.tensor(tensor_data, dtype=torch.float32).npu()
-        self.group.allreduce(tensor)
+        device = torch.npu.current_device()
+        tensor = torch.tensor(tensor_data, dtype=torch.float32, device=device)
+        allreduce(tensor, group_name=self.group_name, op=ReduceOp.SUM)
         return tensor.cpu().tolist()
 
-    def test_broadcast(self, tensor_data, root_rank=0):
+    def test_broadcast(self, tensor_data, src_rank=0):
         """Test broadcast operation."""
-        tensor = torch.tensor(tensor_data, dtype=torch.float32).npu()
-        broadcast_options = BroadcastOptions()
-        broadcast_options.root_rank = root_rank
-        broadcast_options.root_tensor = 0
-        self.group.broadcast(tensor, broadcast_options=broadcast_options)
+        device = torch.npu.current_device()
+        tensor = torch.tensor(tensor_data, dtype=torch.float32, device=device)
+        broadcast(tensor, src_rank=src_rank, group_name=self.group_name)
         return tensor.cpu().tolist()
 
     def test_send(self, tensor_data, dst_rank):
         """Test send operation."""
-        tensor = torch.tensor(tensor_data, dtype=torch.float32).npu()
-        send_options = SendOptions()
-        send_options.dst_rank = dst_rank
-        send_options.dst_gpu_index = 0
-        self.group.send(tensor, send_options=send_options)
+        device = torch.npu.current_device()
+        tensor = torch.tensor(tensor_data, dtype=torch.float32, device=device)
+        send(tensor, dst_rank=dst_rank, group_name=self.group_name)
 
     def test_recv(self, tensor_shape, src_rank):
         """Test recv operation."""
-        tensor = torch.zeros(tensor_shape, dtype=torch.float32).npu()
-        recv_options = RecvOptions()
-        recv_options.src_rank = src_rank
-        recv_options.src_gpu_index = 0
-        self.group.recv(tensor, recv_options=recv_options)
+        device = torch.npu.current_device()
+        tensor = torch.zeros(tensor_shape, dtype=torch.float32, device=device)
+        recv(tensor, src_rank=src_rank, group_name=self.group_name)
         return tensor.cpu().tolist()
 
     def test_allgather(self, tensor_data):
         """Test allgather operation."""
-        tensor = torch.tensor(tensor_data, dtype=torch.float32).npu()
-        # Create output tensors list for each rank
-        output_tensors = [torch.zeros_like(tensor) for _ in range(self.world_size)]
-        allgather_options = AllGatherOptions()
-        self.group.allgather(
-            output_tensors, tensor, allgather_options=allgather_options
-        )
-        return [t.cpu().tolist() for t in output_tensors]
+        device = torch.npu.current_device()
+        tensor = torch.tensor(tensor_data, dtype=torch.float32, device=device)
+        # Create output tensor list for each rank
+        tensor_list = [torch.zeros_like(tensor) for _ in range(2)]
+        allgather(tensor_list=tensor_list, tensor=tensor, group_name=self.group_name)
+        return [t.cpu().tolist() for t in tensor_list]
 
-    def test_reduce(self, tensor_data, root_rank=0):
+    def test_reduce(self, tensor_data, dst_rank=0):
         """Test reduce operation."""
-        tensor = torch.tensor(tensor_data, dtype=torch.float32).npu()
-        reduce_options = ReduceOptions()
-        reduce_options.root_rank = root_rank
-        reduce_options.root_tensor = 0
-        reduce_options.reduceOp = ReduceOp.SUM
-        self.group.reduce(tensor, reduce_options=reduce_options)
+        device = torch.npu.current_device()
+        tensor = torch.tensor(tensor_data, dtype=torch.float32, device=device)
+        reduce(tensor, dst_rank=dst_rank, group_name=self.group_name, op=ReduceOp.SUM)
         return tensor.cpu().tolist()
 
     def test_reducescatter(self, tensor_data_list):
         """Test reducescatter operation."""
+        device = torch.npu.current_device()
         # tensor_data_list is a list of tensors (one per rank)
-        input_tensors = [
-            torch.tensor(data, dtype=torch.float32).npu() for data in tensor_data_list
+        tensor_list = [
+            torch.tensor(data, dtype=torch.float32, device=device)
+            for data in tensor_data_list
         ]
-        output_tensor = torch.zeros_like(input_tensors[0])
-        reducescatter_options = ReduceScatterOptions()
-        reducescatter_options.reduceOp = ReduceOp.SUM
-        self.group.reducescatter(
-            output_tensor, input_tensors, reducescatter_options=reducescatter_options
+        output_tensor = torch.zeros_like(tensor_list[0])
+        reducescatter(
+            tensor=output_tensor,
+            tensor_list=tensor_list,
+            group_name=self.group_name,
+            op=ReduceOp.SUM,
         )
         return output_tensor.cpu().tolist()
 
@@ -137,7 +137,7 @@ def test_broadcast(actors):
 
     root_tensor = [10.0, 20.0]
     results = ray.get(
-        [actor.test_broadcast.remote(root_tensor, root_rank=0) for actor in actors]
+        [actor.test_broadcast.remote(root_tensor, src_rank=0) for actor in actors]
     )
     for result in results:
         assert result == root_tensor, f"Broadcast failed: {result} != {root_tensor}"
@@ -177,8 +177,8 @@ def test_reduce(actors):
     rank1_data = [4.0, 5.0, 6.0]
     results = ray.get(
         [
-            actors[0].test_reduce.remote(rank0_data, root_rank=0),
-            actors[1].test_reduce.remote(rank1_data, root_rank=0),
+            actors[0].test_reduce.remote(rank0_data, dst_rank=0),
+            actors[1].test_reduce.remote(rank1_data, dst_rank=0),
         ]
     )
     expected_root = [5.0, 7.0, 9.0]
@@ -192,7 +192,6 @@ def test_reducescatter(actors):
     world_size = 2
     assert len(actors) == world_size, f"Expected {world_size} actors, got {len(actors)}"
 
-    ranks = ray.get([actor.get_rank.remote() for actor in actors])
     rank0_data = [1.0, 2.0, 3.0]
     rank1_data = [4.0, 5.0, 6.0]
     results = ray.get(
@@ -203,11 +202,12 @@ def test_reducescatter(actors):
     )
     expected_rank0 = [2.0, 4.0, 6.0]
     expected_rank1 = [8.0, 10.0, 12.0]
-    for idx, rank in enumerate(ranks):
-        expected = expected_rank0 if rank == 0 else expected_rank1
-        assert (
-            results[idx] == expected
-        ), f"Reducescatter failed for rank {rank}: {results[idx]} != {expected}"
+    assert (
+        results[0] == expected_rank0
+    ), f"Reducescatter failed for rank 0: {results[0]} != {expected_rank0}"
+    assert (
+        results[1] == expected_rank1
+    ), f"Reducescatter failed for rank 1: {results[1]} != {expected_rank1}"
 
 
 def test_send_recv(actors):
