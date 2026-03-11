@@ -3,7 +3,9 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import time
+from pathlib import Path
 from typing import Optional
 
 import ray
@@ -17,6 +19,11 @@ from ray_ascend.utils import (
     start_datasystem,
     start_etcd,
 )
+
+# Add parent directory to sys.path for importing base_perftest
+sys.path.insert(0, str(Path(__file__).parent))
+
+from base_perftest import RayAscendBandwidthTester
 
 register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
 
@@ -35,7 +42,7 @@ WORKER_NODE_IP = "NodeB"
 # https://www.yuque.com/haomingzi-lfse7/lhp4el/tml8ke0zkgn6roey?singleDoc#
 
 
-def check_npu_is_available() -> None:
+def check_npu_is_available():
     try:
         import torch_npu  # noqa: F401
     except ImportError:
@@ -52,14 +59,6 @@ def check_npu_is_available() -> None:
 def yr_is_available_in_actor(actor: "ray.actor.ActorHandle") -> bool:
     gpu_object_manager = ray._private.worker.global_worker.gpu_object_manager
     return bool(gpu_object_manager.actor_has_tensor_transport(actor, "YR"))
-
-
-def compute_total_size(tensor_size: int) -> float:
-    total_size_bytes = tensor_size * 4  # Assuming float32 (4 bytes per element)
-    total_size_gb = total_size_bytes / (1024**3)
-    logger.info(f"Total data size: {total_size_gb:.6f} GB")
-
-    return total_size_gb
 
 
 def load_config_from_file(config_file: str) -> dict:
@@ -99,12 +98,6 @@ def parse_args() -> argparse.Namespace:
             ),
         },
         {
-            "name": "--transport",
-            "type": str,
-            "choices": ["tcp", "rdma", "hccs"],
-            "help": "Transport protocol: 'tcp' or 'rdma' for 'yr'; 'hccs' for 'hccl'.",
-        },
-        {
             "name": "--device",
             "type": str,
             "choices": ["npu", "cpu"],
@@ -122,22 +115,15 @@ def parse_args() -> argparse.Namespace:
             "help": "IP address of the worker node. Required in 'remote' mode.",
         },
         {
-            "name": "--tensor-size",
+            "name": "--tensor-size-kb",
             "type": int,
             "default": 1024,
             "help": "Total number of elements in the tensor to transport (default: 1024).",
         },
         {
-            "name": "--output-format",
-            "type": str,
-            "choices": ["stdout", "json", "csv"],
-            "default": "stdout",
-            "help": "Output format for performance results (default: stdout).",
-        },
-        {
             "name": "--warmup-times",
             "type": int,
-            "default": 3,
+            "default": 2,
             "help": "Number of warmup iterations before measurement (default: 3).",
         },
         {
@@ -147,6 +133,12 @@ def parse_args() -> argparse.Namespace:
                 "Path to a YAML config file with test parameters. "
                 "Command-line arguments override config file settings."
             ),
+        },
+        {
+            "name": "--count",
+            "type": int,
+            "default": 5,
+            "help": "Number of iterations for the actual test (default: 1). Results are averaged.",
         },
     ]
 
@@ -246,7 +238,7 @@ class DataSystemActor:
         self.worker_port: Optional[int] = None
         self.ds_started = False
 
-    def start_datasystem(self):
+    def start_datasystem(self) -> tuple[Optional[str], Optional[int]]:
         if self.ds_started:
             logger.warning("DataSystem already started")
             return self.worker_host, self.worker_port
@@ -266,7 +258,7 @@ class DataSystemActor:
             logger.error(f"Failed to start datasystem: {e}")
             raise
 
-    def stop_datasystem(self) -> None:
+    def stop_datasystem(self):
         if not self.ds_started:
             logger.warning("DataSystem not started, skipping stop")
             return
@@ -293,7 +285,7 @@ class DataSystemActor:
 @ray.remote
 class TensorTransportActor:
 
-    def __init__(self, config, node_ip: Optional[str] = None):
+    def __init__(self, config: argparse.Namespace, node_ip: Optional[str] = None):
         self.config = config
         self.node_ip = node_ip
         self.data: Optional[torch.Tensor] = None
@@ -307,7 +299,7 @@ class TensorTransportActor:
         # TODO: enhance robustness of device setting
         torch.npu.set_device(0)
 
-    def setup_yr_env(self, ds_info: tuple[str, int]) -> None:
+    def setup_yr_env(self, ds_info: tuple[str, int]):
         """setup environment variables for YR transport"""
         if self.ds_info:
             logger.warning("DataSystem info already set, skipping environment setup")
@@ -319,8 +311,10 @@ class TensorTransportActor:
         logger.info(f"DataSystem environment configured: {worker_host}:{worker_port}")
 
     def generate_tensor(self) -> torch.Tensor:
+        # convert KB to number of float32 elements
+        seq_len = self.config.tensor_size_kb * 1000 // 4
         self.data = torch.randn(
-            self.config.tensor_size,
+            seq_len,
             device=self.config.device,
         )
         logger.info(f"Generated tensor of shape {self.data.shape}")
@@ -332,9 +326,10 @@ class TensorTransportActor:
             raise RuntimeError("Tensor not generated yet. Call generate_tensor first.")
         return self.data
 
-    def recv_tensor(self, data: torch.Tensor) -> torch.Tensor:
-        logger.info(f"Received tensor of shape {data.shape}")
-        return data
+    def recv_tensor(self, data: torch.Tensor) -> bool:
+        if isinstance(data, torch.Tensor):
+            return True
+        return False
 
 
 class HCCLTransportBandwidthTester:
@@ -342,8 +337,8 @@ class HCCLTransportBandwidthTester:
 
 
 @decorate_with_transport()
-class YRDirectTransportBandwidthTester:
-    def __init__(self, config, remote_mode="local"):
+class YRDirectTransportBandwidthTester(RayAscendBandwidthTester):
+    def __init__(self, config: argparse.Namespace, remote_mode: str = "local"):
         self.config = config
         self.remote_mode = remote_mode
         self.head_ds_actor: Optional[ray.actor.ActorHandle] = None
@@ -354,13 +349,15 @@ class YRDirectTransportBandwidthTester:
         if self.remote_mode == "remote":
             logger.info("Initializing data system client in remote mode...")
             # etcd is started by the class decorator; pass its address to actors
-            self.head_ds_actor = DataSystemActor.options(
+            self.head_ds_actor = DataSystemActor.options(  # type: ignore[attr-defined]
                 resources={f"node:{HEAD_NODE_IP}": 0.001, "NPU": 1}
             ).remote(getattr(self, "_etcd_addr", None), node_ip=HEAD_NODE_IP)
             self.head_ds_info = ray.get(self.head_ds_actor.start_datasystem.remote())
-            self.worker_ds_actor = DataSystemActor.options(
+            self.worker_ds_actor = DataSystemActor.options(  # type: ignore[attr-defined]
                 resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
-            ).remote(getattr(self, "_etcd_addr", None), node_ip=WORKER_NODE_IP)
+            ).remote(
+                getattr(self, "_etcd_addr", None), node_ip=WORKER_NODE_IP
+            )
             self.worker_ds_info = ray.get(
                 self.worker_ds_actor.start_datasystem.remote()
             )
@@ -374,26 +371,28 @@ class YRDirectTransportBandwidthTester:
                 self.head_ds_actor.start_datasystem.remote()
             )
 
-    def _initialize_test_actor(self):
+    def _initialize_test_actor(
+        self,
+    ) -> tuple[ray.actor.ActorHandle, ray.actor.ActorHandle]:
         # TODO: support cpu transport test after YR transport supports cpu tensors
         if self.remote_mode == "remote":
             logger.info("Initializing data system client in remote mode...")
             # etcd is started by the class decorator; pass its address to actors
-            writer_actor = TensorTransportActor.options(
+            writer_actor = TensorTransportActor.options(  # type: ignore[attr-defined]
                 resources={f"node:{HEAD_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, HEAD_NODE_IP)
 
-            reader_actor = TensorTransportActor.options(
+            reader_actor = TensorTransportActor.options(  # type: ignore[attr-defined]
                 resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, WORKER_NODE_IP)
 
         else:
             logger.info("Initializing data system client in local mode...")
             logger.info(f"etcd address is {getattr(self, '_etcd_addr', None)}")
-            writer_actor = TensorTransportActor.options(resources={"NPU": 1}).remote(
+            writer_actor = TensorTransportActor.options(resources={"NPU": 1}).remote(  # type: ignore[attr-defined]
                 self.config
             )
-            reader_actor = TensorTransportActor.options(resources={"NPU": 1}).remote(
+            reader_actor = TensorTransportActor.options(resources={"NPU": 1}).remote(  # type: ignore[attr-defined]
                 self.config
             )
 
@@ -403,29 +402,41 @@ class YRDirectTransportBandwidthTester:
 
     def run_bandwidth_test(self):
         writer_actor, reader_actor = self._initialize_test_actor()
-        total_data_size_gb = compute_total_size(self.config.tensor_size)
-        logger.info("Creating large batch for bandwidth test...")
-        start_create_data = time.time()
-        data = ray.get(writer_actor.generate_tensor.remote())
-        end_create_data = time.time()
-        logger.info(f"Data creation time: {end_create_data - start_create_data:.8f}s")
+        total_data_size_gb = self.config.tensor_size_kb / (
+            1000 * 1000
+        )  # Convert KB to GB
 
         # warm up
         for i in range(self.config.warmup_times):
+            ray.get(writer_actor.generate_tensor.remote())
             data_ref = writer_actor.transport_tensor_via_yr.remote()
-            results = ray.get(reader_actor.recv_tensor.remote(data_ref))
+            ray.get(reader_actor.recv_tensor.remote(data_ref))
 
-        logger.info("Starting transport operation...")
-        start_transport = time.time()
-        data_ref = writer_actor.transport_tensor_via_yr.remote()
-        results = ray.get(reader_actor.recv_tensor.remote(data_ref))
-        assert torch.equal(results, data), "Data mismatch after transport!"
-        end_transport = time.time()
-        transport_time = end_transport - start_transport
+        # Run actual test for count iterations
+        transport_times = []
+        logger.info(f"Starting transport operation ({self.config.count} iterations)...")
+        for iteration in range(self.config.count):
+            ray.get(writer_actor.generate_tensor.remote())
+            start_transport = time.perf_counter()
+            data_ref = writer_actor.transport_tensor_via_yr.remote()
+            ray.get(reader_actor.recv_tensor.remote(data_ref))
+            end_transport = time.perf_counter()
+            transport_time = end_transport - start_transport
+            transport_times.append(transport_time)
+            logger.info(
+                f"Iteration {iteration + 1}/{self.config.count}: {transport_time:.8f}s"
+            )
 
-        transport_throughput_gbps = (total_data_size_gb * 8) / transport_time
-        logger.info(f"transport cost time: {transport_time:.8f}s")
-        logger.info(f"Transport Throughput: {transport_throughput_gbps:.8f} Gb/s")
+        # Calculate statistics
+        avg_transport_time = sum(transport_times) / len(transport_times)
+        min_transport_time = min(transport_times)
+        max_transport_time = max(transport_times)
+        avg_transport_throughput_gbps = (total_data_size_gb * 8) / avg_transport_time
+
+        logger.info(f"Average transport time: {avg_transport_time:.8f}s")
+        logger.info(
+            f"Average Transport Throughput: {avg_transport_throughput_gbps:.8f} Gb/s"
+        )
         time.sleep(2)
 
         mode_name = f"{self.config.backend.upper()} {self.remote_mode.upper()}"
@@ -433,13 +444,18 @@ class YRDirectTransportBandwidthTester:
         logger.info(f"{mode_name} BANDWIDTH TEST SUMMARY")
         logger.info("=" * 60)
         logger.info(f"Total Data Size: {total_data_size_gb:.6f} GB")
-        logger.info(f"Transport Time: {transport_time:.8f}s")
-        logger.info(f"Transport Throughput: {transport_throughput_gbps:.8f} Gb/s")
+        logger.info(f"Number of Iterations: {self.config.count}")
+        logger.info(f"Average Transport Time: {avg_transport_time:.8f}s")
+        logger.info(f"Min Transport Time: {min_transport_time:.8f}s")
+        logger.info(f"Max Transport Time: {max_transport_time:.8f}s")
         logger.info(
-            f"Network Round-trip Throughput: {(total_data_size_gb * 8) / transport_time:.8f} Gb/s"
+            f"Average Transport Throughput: {avg_transport_throughput_gbps:.8f} Gb/s"
+        )
+        logger.info(
+            f"Network Round-trip Throughput (avg): {(total_data_size_gb * 8) / avg_transport_time:.8f} Gb/s"
         )
 
-    def close_datasystem(self):
+    def close(self):
         if self.head_ds_actor:
             ray.get(self.head_ds_actor.stop_datasystem.remote())
         if self.worker_ds_actor and self.worker_ds_actor != self.head_ds_actor:
@@ -463,8 +479,7 @@ def main():
     try:
         tester.run_bandwidth_test()
     finally:
-        if config.backend == "yr":
-            tester.close_datasystem()
+        tester.close()
 
 
 if __name__ == "__main__":

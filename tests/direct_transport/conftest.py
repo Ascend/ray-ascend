@@ -1,14 +1,9 @@
 import logging
 import os
-import random
 import shutil
 import subprocess
-import tempfile
-import time
-from typing import Optional
 
 import pytest
-import requests
 
 try:
     from yr import datasystem

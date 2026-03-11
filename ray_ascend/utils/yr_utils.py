@@ -8,7 +8,6 @@ import tempfile
 import time
 from typing import Optional
 
-import pytest
 import requests
 
 logger = logging.getLogger(__name__)
@@ -18,14 +17,14 @@ def check_dscli_available() -> bool:
     return shutil.which("dscli") is not None
 
 
-def get_free_port():
+def get_free_port() -> int:
     """Find and return an available TCP port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("", 0))
-        return s.getsockname()[1]
+        return int(s.getsockname()[1])
 
 
-def check_etcd_installed() -> None:
+def check_etcd_installed():
     """Raise RuntimeError if 'etcd' is not found in PATH."""
     if shutil.which("etcd") is None:
         raise RuntimeError(
@@ -38,7 +37,7 @@ def start_etcd(
     client_port: Optional[int] = None,
     peer_port: Optional[int] = None,
     max_retries: int = 3,
-):
+) -> tuple[str, subprocess.Popen, str]:
     """Start etcd in a subprocess and wait until it's healthy."""
     check_etcd_installed()
 
@@ -114,7 +113,7 @@ def start_datasystem(
     worker_host: str = "127.0.0.1",
     worker_port: Optional[int] = None,
     max_retries: int = 3,
-):
+) -> tuple[str, int]:
     """Start yuanrong datasystem worker via dscli and verify success by checking '[  OK  ]' in output."""
     for attempt in range(max_retries):
 
