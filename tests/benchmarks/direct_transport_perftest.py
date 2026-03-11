@@ -74,9 +74,7 @@ def parse_args() -> argparse.Namespace:
     """
     The following parameters are not currently supported:
     transport
-    warmup-times
     output-format
-    config-file
     """
     arg_configs = [
         {
