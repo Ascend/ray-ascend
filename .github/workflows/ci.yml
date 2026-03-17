@@ -32,8 +32,7 @@ jobs:
           python${{ matrix.python-version }} -m pytest -v tests/
       - name: Install etcd
         run: |
-          wget https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-arm64.tar.gz
-          tar xzf etcd-v3.6.5-linux-arm64.tar.gz
+          curl -L https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-arm64.tar.gz -o etcd-v3.6.5-linux-arm64.tar.gz
           sudo mv etcd-v3.6.5-linux-arm64/etcd /usr/local/bin/
       - name: Run performance test (sanity check)
         run: |
