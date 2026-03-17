@@ -30,6 +30,10 @@ jobs:
         run: |
           echo "Running tests for Python ${{ matrix.python-version }}..."
           python${{ matrix.python-version }} -m pytest -v tests/
+      - name: Run performance test (sanity check)
+        run: |
+          echo "Running perf_test.py to ensure it's not broken..."
+          python${{ matrix.python-version }} tests/benchmarks/direct_transport_perftest.py --backend=yr --placement=local --device=npu
 
   build-docs:
     runs-on: ubuntu-latest
