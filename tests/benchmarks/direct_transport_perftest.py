@@ -11,7 +11,6 @@ from typing import Optional
 import ray
 import torch
 import yaml
-from omegaconf import OmegaConf
 from ray.experimental import register_tensor_transport
 
 from ray_ascend.direct_transport import YRTensorTransport
@@ -165,7 +164,9 @@ def parse_args() -> argparse.Namespace:
         HEAD_NODE_IP = final_args.head_node_ip
         WORKER_NODE_IP = final_args.worker_node_ip
 
-    logger.info(f"Test configuration:\n{OmegaConf.to_yaml(vars(final_args))}")
+    logger.info(
+        f"Test configuration:\n{yaml.dump(vars(final_args), default_flow_style=False)}"
+    )
     return final_args
 
 
