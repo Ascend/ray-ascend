@@ -32,12 +32,22 @@ jobs:
           python${{ matrix.python-version }} -m pytest -v tests/
       - name: Install etcd
         run: |
-          curl -L https://github.com/etcd-io/etcd/releases/download/v3.6.5/etcd-v3.6.5-linux-arm64.tar.gz -o etcd-v3.6.5-linux-arm64.tar.gz
-          sudo mv etcd-v3.6.5-linux-arm64/etcd /usr/local/bin/
-      - name: Run performance test (sanity check)
+          apt-get update && apt-get install -y curl
+          curl -s -L https://mirrors.huaweicloud.com/etcd/v3.6.5/etcd-v3.6.5-linux-arm64.tar.gz -o etcd-v3.6.5-linux-arm64.tar.gz
+          tar -xzf etcd-v3.6.5-linux-arm64.tar.gz
+          mv etcd-v3.6.5-linux-arm64/etcd /usr/local/bin/
+      - name: Install temporary yuanrong-datasystem # TODO: remove these codes after yuanrong-datasystem-0.8.0 is released
         run: |
-          echo "Running perf_test.py to ensure it's not broken..."
+          curl -s -L https://build-logs.openeuler.openatom.cn:38080/temp-archived/openeuler/openYuanrong/yr_daily/aarch64/20260318/openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl -o openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl
+          pip${{ matrix.python-version }} install openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl --force --no-deps
+      - name: Run performance test (use npu tensors in the local node)
+        run: |
+          echo "start ray cluster"
+          ray start --head
+          echo "Running direct_transport_perftest.py"
           python${{ matrix.python-version }} tests/benchmarks/direct_transport_perftest.py --backend=yr --placement=local --device=npu
+          echo "stop ray cluster"
+          ray stop
 
   build-docs:
     runs-on: ubuntu-latest
