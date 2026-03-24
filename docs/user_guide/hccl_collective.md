@@ -90,7 +90,7 @@ class Worker:
     def broadcast_tensor(self, src_rank=0):
         import torch
         tensor = torch.ones(10).npu() if self.rank == src_rank else torch.zeros(10).npu()
-        collective.broadcast(tensor, src_rank=src_rank, group_name="my_group")
+        collective.broadcast(tensor, src_rank=src_rank, group_name="my_hccl_group")
         return tensor.cpu().tolist()
 
 # Create and setup group...
