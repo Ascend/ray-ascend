@@ -9,6 +9,11 @@ nav:
   - Home: index.md
   - User Guide:
       - Overview: user_guide/index.md
+      - Installation: user_guide/installation.md
+      - HCCL Collective Communication: user_guide/hccl_collective.md
+      - YuanRong Direct Transport: user_guide/yr_transport.md
+      - API Reference: user_guide/api_reference.md
+      - Best Practices: user_guide/best_practices.md
   - Developer Guide:
       - Overview: developer_guide/index.md
       - Setup: developer_guide/setup.md
