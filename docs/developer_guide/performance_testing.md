@@ -55,6 +55,17 @@ ______________________________________________________________________
 Tests YuanRong direct tensor transport performance between Ray actors. This test
 measures the throughput and latency of tensor transfers using YR Direct Transport.
 
+### Additional Prerequisites
+
+YR Direct Transport requires **etcd** for service coordination. The test framework
+automatically starts and manages an etcd instance during test execution:
+
+- **Local mode**: etcd runs on localhost (127.0.0.1)
+- **Remote mode**: etcd runs on the head node
+
+No manual etcd installation or configuration is required - the test harness handles etcd
+lifecycle management automatically.
+
 ### Running the Test
 
 #### Using Command Line Arguments
@@ -95,7 +106,7 @@ count: 100
 Then run:
 
 ```bash
-python tests/benchmarks/direct_transport_perftest.py --config-file config.yaml
+python tests/benchmarks/direct_transport_perftest.py --config-file custom_config_path/config.yaml
 ```
 
 Command-line arguments override config file settings.
