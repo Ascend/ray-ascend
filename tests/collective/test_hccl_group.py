@@ -208,7 +208,6 @@ def test_reducescatter(actors):
     world_size = 2
     assert len(actors) == world_size, f"Expected {world_size} actors, got {len(actors)}"
 
-    ranks = ray.get([actor.get_rank.remote() for actor in actors])
     rank0_data = [1.0, 2.0, 3.0]
     rank1_data = [4.0, 5.0, 6.0]
     results = ray.get(
@@ -219,11 +218,12 @@ def test_reducescatter(actors):
     )
     expected_rank0 = [2.0, 4.0, 6.0]
     expected_rank1 = [8.0, 10.0, 12.0]
-    for idx, rank in enumerate(ranks):
-        expected = expected_rank0 if rank == 0 else expected_rank1
-        assert (
-            results[idx] == expected
-        ), f"Reducescatter failed for rank {rank}: {results[idx]} != {expected}"
+    assert (
+        results[0] == expected_rank0
+    ), f"Reducescatter failed for rank 0: {results[0]} != {expected_rank0}"
+    assert (
+        results[1] == expected_rank1
+    ), f"Reducescatter failed for rank 1: {results[1]} != {expected_rank1}"
 
 
 def test_send_recv(actors):
