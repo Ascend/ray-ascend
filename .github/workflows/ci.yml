@@ -17,6 +17,13 @@ jobs:
         python-version: ["3.11"]
     timeout-minutes: 10
     steps:
+      - name: Config mirrors
+        run: |
+          sed -Ei 's@(ports|archive).ubuntu.com@cache-service.nginx-pypi-cache.svc.cluster.local:8081@g' /etc/apt/sources.list
+          pip config set global.index-url http://cache-service.nginx-pypi-cache.svc.cluster.local/pypi/simple
+          pip config set global.trusted-host cache-service.nginx-pypi-cache.svc.cluster.local
+          apt-get update -y
+
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Build Python ${{ matrix.python-version }} wheel
@@ -36,9 +43,11 @@ jobs:
           curl -s -L https://mirrors.huaweicloud.com/etcd/v3.6.5/etcd-v3.6.5-linux-arm64.tar.gz -o etcd-v3.6.5-linux-arm64.tar.gz
           tar -xzf etcd-v3.6.5-linux-arm64.tar.gz
           mv etcd-v3.6.5-linux-arm64/etcd /usr/local/bin/
-      - name: Install temporary yuanrong-datasystem # TODO: remove these codes after yuanrong-datasystem-0.8.0 is released
+      - name: Install yuanrong-datasystem
         run: |
-          curl -s -L https://build-logs.openeuler.openatom.cn:38080/temp-archived/openeuler/openYuanrong/yr_daily/aarch64/20260318/openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl -o openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl
+          DATE=$(date -d "-3 days" +%Y%m%d)
+          echo "Downloading yuanrong-datasystem of ${DATE} version"
+          curl -s -L https://build-logs.openeuler.openatom.cn:38080/temp-archived/openeuler/openYuanrong/yr_daily/aarch64/${DATE}/openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl -o openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl
           pip${{ matrix.python-version }} install openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl --force --no-deps
       - name: Run performance test (use npu tensors in the local node)
         run: |
