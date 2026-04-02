@@ -9,7 +9,7 @@ Ray Ascend Plugin
 </h3>
 
 <p align="center">
-| <a href="https://www.hiascend.com/en/"><b>About Ascend</b></a> | <a href="https://github.com/Ascend/ray-ascend/blob/master/README.md"><b>Documentation</b></a> |
+| <a href="https://www.hiascend.com/en/"><b>About Ascend</b></a> | <a href="https://ascend.github.io/ray-ascend/"><b>Documentation</b></a> |
 </p>
 
 ## Overview
