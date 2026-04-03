@@ -1,5 +1,5 @@
 site_name: "ray-ascend"
-site_description: "Ray Ascend - 分布式计算框架"
+site_description: "Ray Ascend"
 site_author: "ray-ascend"
 
 docs_dir: .
