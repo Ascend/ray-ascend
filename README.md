@@ -131,7 +131,7 @@ cpu_tensor = ray.get(sender.transfer_cpu_tensor_via_rdma())
 
 ## Contributing
 
-See [CONTRIBUTING](./CONTRIBUTING.md) for more details—a step-by-step guide to help
+See [CONTRIBUTING](./CONTRIBUTING.md) and [developer guide](https://ascend.github.io/ray-ascend/developer_guide/) for more details—a step-by-step guide to help
 you set up your development environment, build, and test. Please let us know if you find
 a bug or request a feature by
 [filing an issue](https://github.com/Ascend/ray-ascend/issues).

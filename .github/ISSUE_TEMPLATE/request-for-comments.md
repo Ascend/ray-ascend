@@ -1,11 +1,15 @@
 ---
-name: Request For Comments
-about: Designs or feature requests of ray-ascend
-title: '[collective|rdt|docs|...] '
+name: Feature Request
+about: Feature request or design discussion
+title: '[RFC] '
 labels: enhancement
 assignees: tianyi-ge
 ---
 
-**Description** A short description of your feature
+### Description
 
-**Use case** Describe the use case of your feature.
+<!-- Briefly describe the feature you'd like to see -->
+
+### Use Case
+
+<!-- Describe the use case for this feature -->

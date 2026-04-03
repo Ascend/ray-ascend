@@ -1,4 +1,4 @@
-# Ray-Ascend Documentation
+# Ray-Ascend
 
 Welcome to the official documentation for **Ray-Ascend** — a high-performance extension
 for [Ray](https://github.com/ray-project/ray) that enables efficient tensor transport

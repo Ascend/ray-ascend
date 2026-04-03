@@ -1,18 +1,22 @@
 ---
-name: Bug report
-about: Problems and issues with code of ray-ascend
-title: '[collective|rdt|docs|...] '
+name: Bug Report
+about: Report a bug
+title: '[bug] '
 labels: bug
 assignees: tianyi-ge
 ---
 
-**What happened + What you expected to happen** Describe 1. the bug 2. expected behavior
-3\. useful information (e.g., logs)
+### Description
 
-**Versions / Dependencies** Please specify the versions of ray-ascend, ray, Python, OS,
-and other libraries that are used.
+<!-- Briefly describe the issue you're experiencing -->
 
-**To Reproduce** Please provide a reproducible script to help us triage and address the
-issues asap.
+### Steps to Reproduce
 
-**Screenshots** If applicable, add screenshots to help explain your problem.
+<!-- Describe how to reproduce the issue -->
+
+### Environment
+
+- ray-ascend version:
+- Ray version:
+- Python version:
+- OS:

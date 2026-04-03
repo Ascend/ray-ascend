@@ -1,5 +1,5 @@
-site_name: "ray-ascend document"
-site_description: "ray-ascend document — user guide and developer guide"
+site_name: "ray-ascend"
+site_description: "Ray Ascend - 分布式计算框架"
 site_author: "ray-ascend"
 
 docs_dir: .
@@ -18,18 +18,73 @@ nav:
       - Overview: developer_guide/index.md
       - Setup: developer_guide/setup.md
       - Contributing: developer_guide/contributing.md
+
 theme:
   name: material
   language: en
+  logo: logo/ray-ascend-logo.png
+  favicon: logo/ray-ascend-logo.png
   features:
     - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.select
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/git-alt
+    edit: material/pencil
+    view: material/eye
+
+extra_css:
+  - stylesheets/extra.css
+
 markdown_extensions:
   - toc:
       permalink: true
+      title: On this page
   - admonition
   - footnotes
   - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+
 plugins:
   - search
+
 extra:
-  repository_url: https://gitcode.com/Ascend/ray-ascend
+  social:
+    - icon: fontawesome/brands/git-alt
+      link: https://gitcode.com/Ascend/ray-ascend
