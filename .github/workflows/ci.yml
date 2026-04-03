@@ -45,10 +45,20 @@ jobs:
           mv etcd-v3.6.5-linux-arm64/etcd /usr/local/bin/
       - name: Install yuanrong-datasystem
         run: |
-          DATE=$(date -d "-3 days" +%Y%m%d)
-          echo "Downloading yuanrong-datasystem of ${DATE} version"
-          curl -s -L https://build-logs.openeuler.openatom.cn:38080/temp-archived/openeuler/openYuanrong/yr_daily/aarch64/${DATE}/openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl -o openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl
-          pip${{ matrix.python-version }} install openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl --force --no-deps
+          for i in 0 1 2; do
+            DATE=$(date -d "-${i} days" +%Y%m%d)
+            echo "Attempt ${i}: Trying yuanrong-datasystem version ${DATE}"
+            if curl -s -L https://build-logs.openeuler.openatom.cn:38080/temp-archived/openeuler/openYuanrong/yr_daily/aarch64/${DATE}/openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl -o openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl; then
+              if pip${{ matrix.python-version }} install openyuanrong_datasystem-9.9.9-cp311-cp311-manylinux_2_34_aarch64.whl --force --no-deps; then
+                echo "Successfully installed yuanrong-datasystem version ${DATE}"
+                break
+              fi
+            fi
+            if [ $i -eq 2 ]; then
+              echo "Failed to install yuanrong-datasystem after 3 attempts"
+              exit 1
+            fi
+          done
       - name: Run performance test (use npu tensors in the local node)
         run: |
           echo "start ray cluster"
