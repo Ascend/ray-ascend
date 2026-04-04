@@ -86,6 +86,11 @@
   background-color: var(--primary-bg);
   border-radius: 0;
   padding: 40px 60px;
+  max-width: none;
+}
+
+.md-grid {
+  max-width: 90rem;
 }
 
 .md-typeset h1 {
