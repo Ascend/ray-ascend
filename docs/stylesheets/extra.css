@@ -86,10 +86,15 @@
   background-color: var(--primary-bg);
   border-radius: 0;
   padding: 40px 60px;
+  max-width: none;
+}
+
+.md-grid {
+  max-width: 90rem;
 }
 
 .md-typeset h1 {
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin-bottom: 1.5rem;
@@ -97,7 +102,7 @@
 }
 
 .md-typeset h2 {
-  font-size: 1.75rem;
+  font-size: 1.35rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   margin-top: 2.5rem;
@@ -108,7 +113,7 @@
 }
 
 .md-typeset h3 {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
