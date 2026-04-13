@@ -192,6 +192,11 @@ Before submitting, please ensure:
 - ✅ CLA is signed (first-time contributors)
 - ✅ Commit email matches CLA email
 
+## Performance Testing
+
+For instructions on running performance benchmarks for YuanRong Direct Transport, see
+[Performance Testing Guide](performance_testing.md).
+
 ## Documentation
 
 Documentation updates should be made to the relevant `.md` files in the `docs/`
