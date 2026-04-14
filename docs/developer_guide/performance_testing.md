@@ -66,15 +66,50 @@ automatically starts and manages an etcd instance during test execution:
 No manual etcd installation or configuration is required - the test harness handles etcd
 lifecycle management automatically.
 
+### Parameters
+
+| Parameter          | Type | Choices       | Default  | Description                                                  |
+| ------------------ | ---- | ------------- | -------- | ------------------------------------------------------------ |
+| `--backend`        | str  | yr, hccl      | required | Transport backend                                            |
+| `--placement`      | str  | local, remote | local    | Test deployment mode                                         |
+| `--device`         | str  | npu, cpu      | cpu      | Device to run tensors on                                     |
+| `--head-node-ip`   | str  | -             | -        | IP address of Ray head node (required for remote mode)       |
+| `--worker-node-ip` | str  | -             | -        | IP address of worker node (required for remote mode)         |
+| `--tensor-size-kb` | int  | -             | 1024     | Total number of KB in tensor (converted to float32 elements) |
+| `--warmup-times`   | int  | -             | 2        | Number of warmup iterations before measurement               |
+| `--count`          | int  | -             | 5        | Number of test iterations (results are averaged)             |
+| `--config-file`    | str  | -             | -        | Path to YAML config file                                     |
+
 ### Running the Test
 
 #### Using Command Line Arguments
 
+A simple case:
+
 ```bash
+python tests/benchmarks/direct_transport_perftest.py --backend yr
+```
+
+Detailed settings:
+
+```bash
+# Local mode
 python tests/benchmarks/direct_transport_perftest.py \
   --backend yr \
   --placement local \
   --device cpu \
+  --tensor-size-kb 1024 \
+  --warmup-times 2 \
+  --count 5
+
+
+# Remote mode (head: 10.170.27.237 ; worker: 10.170.27.158)
+python tests/benchmarks/direct_transport_perftest.py \
+  --backend yr \
+  --placement local \
+  --device cpu \
+  --head_node_ip "10.170.27.237"\
+  --worker_node_ip "10.170.27.158"\
   --tensor-size-kb 1024 \
   --warmup-times 2 \
   --count 5
@@ -111,21 +146,7 @@ python tests/benchmarks/direct_transport_perftest.py --config-file custom_config
 
 Command-line arguments override config file settings.
 
-### Parameters
-
-| Parameter          | Type | Choices       | Default  | Description                                                  |
-| ------------------ | ---- | ------------- | -------- | ------------------------------------------------------------ |
-| `--backend`        | str  | yr, hccl      | required | Transport backend                                            |
-| `--placement`      | str  | local, remote | local    | Test deployment mode                                         |
-| `--device`         | str  | npu, cpu      | cpu      | Device to run tensors on                                     |
-| `--head-node-ip`   | str  | -             | -        | IP address of Ray head node (required for remote mode)       |
-| `--worker-node-ip` | str  | -             | -        | IP address of worker node (required for remote mode)         |
-| `--tensor-size-kb` | int  | -             | 1024     | Total number of KB in tensor (converted to float32 elements) |
-| `--warmup-times`   | int  | -             | 2        | Number of warmup iterations before measurement               |
-| `--count`          | int  | -             | 5        | Number of test iterations (results are averaged)             |
-| `--config-file`    | str  | -             | -        | Path to YAML config file                                     |
-
-### Example Configuration
+**Example Configuration**
 
 An example configuration file is provided at
 `tests/benchmarks/direct_transport_config.yaml`.
