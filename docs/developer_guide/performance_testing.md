@@ -103,13 +103,13 @@ python tests/benchmarks/direct_transport_perftest.py \
   --count 5
 
 
-# Remote mode (head: 10.170.27.237 ; worker: 10.170.27.158)
+# Remote mode (head: NODE_A ; worker: NODE_B)
 python tests/benchmarks/direct_transport_perftest.py \
   --backend yr \
   --placement local \
   --device cpu \
-  --head_node_ip "10.170.27.237"\
-  --worker_node_ip "10.170.27.158"\
+  --head_node_ip NODE_A\
+  --worker_node_ip NODE_B\
   --tensor-size-kb 1024 \
   --warmup-times 2 \
   --count 5
@@ -127,9 +127,9 @@ placement: remote
 # Device to run tensors on: 'npu' or 'cpu'
 device: npu
 # IP address of the Ray head node (required for remote mode)
-head_node_ip: "10.170.27.237"
+head_node_ip: NODE_A
 # IP address of the worker node (required for remote mode)
-worker_node_ip: "10.170.27.158"
+worker_node_ip: NODE_B
 # Total tensor size in KB
 tensor_size_kb: 1000
 # Number of warmup iterations before measurement
