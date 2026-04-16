@@ -19,7 +19,7 @@ from ray_ascend.utils import (
     start_etcd,
 )
 
-register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
+register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
 
 # Add parent directory to sys.path for importing base_perftest
 sys.path.insert(0, str(Path(__file__).parent))
@@ -48,11 +48,6 @@ def check_npu_is_available():
             raise RuntimeError(
                 "NPU device specified but not available. Please check your environment."
             )
-
-
-def yr_is_available_in_actor(actor: "ray.actor.ActorHandle") -> bool:
-    gpu_object_manager = ray._private.worker.global_worker.gpu_object_manager
-    return bool(gpu_object_manager.actor_has_tensor_transport(actor, "YR"))
 
 
 def load_config_from_file(config_file: str) -> dict:
@@ -266,7 +261,7 @@ class DataSystemActor:
 class YRTensorTransportActor:
 
     def __init__(self, config: argparse.Namespace, node_ip: Optional[str] = None):
-        register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
+        register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
         self.config = config
         self.node_ip = node_ip
         self.data: Optional[torch.Tensor] = None

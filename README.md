@@ -81,7 +81,7 @@ from ray_ascend.collective import HCCLGroup
 from ray_ascend.direct_transport import HCCLTensorTransport
 
 ray.register_collective_backend("HCCL", HCCLGroup)
-register_tensor_transport("HCCL", ["npu"], HCCLTensorTransport)
+register_tensor_transport("HCCL", ["npu"], HCCLTensorTransport, torch.Tensor)
 
 
 @ray.remote(resources={"NPU": 1})
@@ -112,7 +112,7 @@ provided) using Ray objects.
 import ray
 from ray_ascend.direct_transport import YRTensorTransport
 from ray.experimental import register_tensor_transport
-register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
+register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
 
 @ray.remote(resources={"NPU": 1})
 class RayActor:

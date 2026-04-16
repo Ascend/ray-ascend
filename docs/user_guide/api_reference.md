@@ -60,8 +60,9 @@ YRTensorTransport()
 Register YR tensor transport with:
 
 ```python
+import torch
 from ray.experimental import register_tensor_transport
 from ray_ascend.direct_transport import YRTensorTransport
 
-register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
+register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
 ```
