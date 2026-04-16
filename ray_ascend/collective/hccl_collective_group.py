@@ -359,13 +359,28 @@ class HCCLGroup(BaseGroup):
             None
         """
 
+        input_flattened = [_flatten_for_scatter_gather(tensor_list, copy=False)]
+
+        input_tensor = self._validate_tensor(input_flattened[0])
+        output_tensor = self._validate_tensor(tensor)
+        comm, stream = self._validate_collective_state()
+
+        # Copy tensors and record event for proper stream synchronization
+        copy_stream = torch.npu.current_stream()
+        for j, in_tensor in enumerate(tensor_list):
+            input_flattened[0][j].copy_(in_tensor)
+        copy_event = torch.npu.Event()
+        copy_event.record(copy_stream)
+
         def collective_fn(
             input_tensor: torch.Tensor, output_tensor: torch.Tensor, comm, stream
         ):
             with torch.npu.device(input_tensor.device):
-                # HcclResult HcclReduceScatter(void *sendBuf, void *recvBuf, uint64_t recvCount, HcclDataType dataType, HcclReduceOp op, HcclComm comm, aclrtStream stream)
+                # Wait for copy operations to complete
+                stream.wait_event(copy_event)
                 current_stream = torch.npu.current_stream()
                 stream.wait_stream(current_stream)
+                # HcclResult HcclReduceScatter(void *sendBuf, void *recvBuf, uint64_t recvCount, HcclDataType dataType, HcclReduceOp op, HcclComm comm, aclrtStream stream)
                 exec_result = self.libhccl.HcclReduceScatter(
                     buffer_type(input_tensor.data_ptr()),
                     buffer_type(output_tensor.data_ptr()),
@@ -378,17 +393,15 @@ class HCCLGroup(BaseGroup):
                 event = torch.npu.Event()
                 event.record(stream)
                 current_stream.wait_event(event)
-                logger.debug(f"HcclReduceScatter execute result : {exec_result}")
+            logger.debug(f"HcclReduceScatter execute result : {exec_result}")
 
-        input_flattened = [_flatten_for_scatter_gather(tensor_list, copy=False)]
-
-        for j, in_tensor in enumerate(tensor_list):
-            input_flattened[0][j].copy_(in_tensor)
-
-        input_tensor = self._validate_tensor(input_flattened[0])
-        output_tensor = self._validate_tensor(tensor)
-        comm, stream = self._validate_collective_state()
         collective_fn(input_tensor, output_tensor, comm, stream)
+
+        # Record completion event on HCCL stream and wait on caller's current stream
+        # This ensures output_tensor is ready before caller reads it
+        completion_event = torch.npu.Event()
+        completion_event.record(stream)
+        torch.npu.current_stream().wait_event(completion_event)
 
     def send(
         self, tensor: torch.Tensor, send_options: SendOptions = SendOptions()

@@ -3,7 +3,7 @@ import os
 import pickle
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import ray
 import torch
@@ -109,9 +109,7 @@ class YRTensorTransport(TensorTransportManager):
         ) -> bool:
             # Check if yr.datasystem worker is healthy
             try:
-                from ray.experimental.gpu_object_manager.util import (
-                    get_tensor_transport_manager,
-                )
+                from ray.experimental.rdt.util import get_tensor_transport_manager
 
                 return (  # type: ignore[no-any-return]
                     get_tensor_transport_manager("YR")
@@ -172,7 +170,7 @@ class YRTensorTransport(TensorTransportManager):
 
         return YRTransportMetadata(
             tensor_meta=tensor_meta,
-            tensor_device=device,
+            tensor_device=device.type,
             ds_serialized_keys=serialized_keys,
         )
 
@@ -189,16 +187,20 @@ class YRTensorTransport(TensorTransportManager):
         obj_id: str,
         tensor_transport_metadata: TensorTransportMetadata,
         communicator_metadata: CommunicatorMetadata,
+        target_buffers: Optional[List[Any]] = None,
     ) -> List["torch.Tensor"]:
-        # create empty tensors from meta data
-        tensors = []
-        device = tensor_transport_metadata.tensor_device
-        for meta_data in tensor_transport_metadata.tensor_meta:
-            shape, dtype = meta_data
-            import torch
+        # Use pre-allocated target buffers if provided, otherwise create empty tensors
+        if target_buffers is not None:
+            tensors = target_buffers
+        else:
+            tensors = []
+            device = tensor_transport_metadata.tensor_device
+            for meta_data in tensor_transport_metadata.tensor_meta:
+                shape, dtype = meta_data
+                import torch
 
-            tensor = torch.empty(size=shape, dtype=dtype, device=device)
-            tensors.append(tensor)
+                tensor = torch.empty(size=shape, dtype=dtype, device=device)
+                tensors.append(tensor)
 
         assert isinstance(tensor_transport_metadata, YRTransportMetadata)
         assert isinstance(communicator_metadata, YRCommunicatorMetadata)
@@ -206,7 +208,7 @@ class YRTensorTransport(TensorTransportManager):
         serialized_keys = tensor_transport_metadata.ds_serialized_keys
         keys = pickle.loads(serialized_keys)
 
-        device_type = device.type
+        device_type = tensor_transport_metadata.tensor_device
         ds_client = self.get_ds_client(device_type)
         try:
             ds_client.get(keys=keys, tensors=tensors)
@@ -234,10 +236,11 @@ class YRTensorTransport(TensorTransportManager):
         self,
         obj_id: str,
         tensor_transport_meta: TensorTransportMetadata,
+        tensors: Optional[List[Any]] = None,
     ):
         assert isinstance(tensor_transport_meta, YRTransportMetadata)
         serialized_keys = tensor_transport_meta.ds_serialized_keys
-        device_type = tensor_transport_meta.tensor_device.type
+        device_type = tensor_transport_meta.tensor_device
         if serialized_keys is not None:
             keys = pickle.loads(serialized_keys)
             ds_client = self.get_ds_client(device_type)

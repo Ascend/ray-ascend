@@ -36,7 +36,7 @@ from ray_ascend.direct_transport import YRTensorTransport
 ray.init()
 
 # Register YR tensor transport for both CPU and NPU tensors
-register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
+register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
 
 @ray.remote(resources={"NPU": 1})
 class NPUActor:
@@ -91,7 +91,7 @@ from ray_ascend.direct_transport import YRTensorTransport
 
 # Register both backends
 ray.register_collective_backend("HCCL", HCCLGroup)
-register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport)
+register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
 
 @ray.remote(resources={"NPU": 1})
 class RayActor:

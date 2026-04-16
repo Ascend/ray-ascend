@@ -126,7 +126,7 @@ class TestCPUTransport:
 
         assert isinstance(meta, YRTransportMetadata)
         assert len(meta.tensor_meta) == len(cpu_tensors)
-        assert meta.tensor_device.type == "cpu"
+        assert meta.tensor_device == "cpu"
         assert isinstance(meta.ds_serialized_keys, (bytes, bytearray))
 
         mock_client.mcreate.assert_called_once()
@@ -217,7 +217,7 @@ class TestNPUTransport:
 
         assert isinstance(meta, YRTransportMetadata)
         assert len(meta.tensor_meta) == len(npu_tensors)
-        assert meta.tensor_device.type == "npu"
+        assert meta.tensor_device == "npu"
         assert isinstance(meta.ds_serialized_keys, (bytes, bytearray))
 
         mock_client.dev_mset.assert_called_once()
