@@ -2,7 +2,6 @@ import argparse
 import logging
 import os
 import shutil
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -11,15 +10,9 @@ from typing import Optional
 import ray
 import torch
 import yaml
-from ray.experimental import register_tensor_transport
 
-from ray_ascend.direct_transport import YRTensorTransport
-from ray_ascend.utils import (
-    start_datasystem,
-    start_etcd,
-)
-
-register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
+from ray_ascend import register_yr_tensor_transport
+from ray_ascend.utils import cleanup_yr_resources, start_etcd
 
 # Add parent directory to sys.path for importing base_perftest
 sys.path.insert(0, str(Path(__file__).parent))
@@ -34,6 +27,47 @@ logger = logging.getLogger(__name__)
 
 HEAD_NODE_IP = "NodeA"
 WORKER_NODE_IP = "NodeB"
+
+
+class EtcdUtil:
+    """Utility class to manage etcd process and lifecycle.
+
+    Used in CI testing scenarios where etcd needs to be started automatically.
+    """
+
+    def __init__(self, host: str = "127.0.0.1"):
+        """Start etcd process.
+
+        Args:
+            host: The host to bind etcd to. Defaults to "127.0.0.1".
+        """
+        self.etcd_addr, self.etcd_proc, self.etcd_data_dir = start_etcd(host=host)
+        logger.info(f"EtcdUtil initialized with address: {self.etcd_addr}")
+
+    def close(self):
+        """Stop etcd process and clean up resources."""
+        if self.etcd_proc:
+            try:
+                self.etcd_proc.terminate()
+                self.etcd_proc.wait(timeout=5)
+                logger.info("Etcd process terminated successfully")
+                self.etcd_proc = None
+            except Exception as e:
+                logger.error(f"Error terminating etcd process: {e}")
+
+        if self.etcd_data_dir and os.path.exists(self.etcd_data_dir):
+            try:
+                shutil.rmtree(self.etcd_data_dir, ignore_errors=True)
+                logger.info(f"Etcd data directory cleaned up: {self.etcd_data_dir}")
+            except Exception as e:
+                logger.error(f"Error cleaning up etcd data directory: {e}")
+
+    def __del__(self):
+        """Ensure etcd is closed when object is destroyed."""
+        try:
+            self.close()
+        except Exception:
+            pass
 
 
 def check_npu_is_available():
@@ -69,6 +103,17 @@ def parse_args() -> argparse.Namespace:
             "type": str,
             "choices": ["yr", "hccl"],
             "help": "Transport backend: 'yr' for YR Direct Transport, 'hccl' for HCCL.",
+        },
+        {
+            "name": "--init-mode",
+            "type": str,
+            "choices": ["etcd", "metastore"],
+            "default": "etcd",
+            "help": (
+                "YR backend initialization mode. \n"
+                "'etcd': manual etcd setup (default). \n"
+                "'metastore': auto-init via YRBackendCoordinator."
+            ),
         },
         {
             "name": "--placement",
@@ -165,151 +210,51 @@ def parse_args() -> argparse.Namespace:
     return final_args
 
 
-class EtcdUtil:
-    """Utility class to manage etcd process and lifecycle."""
+def _create_yr_tensor_transport_actor_class():
+    """Factory function to create YRTensorTransportActor class dynamically.
 
-    def __init__(self, host: str = "127.0.0.1"):
-        """Start etcd process.
+    This must be called after register_yr_tensor_transport() to ensure
+    YR transport is registered before the @ray.method(tensor_transport="YR")
+    decorator is parsed.
+    """
 
-        Args:
-            host: The host to bind etcd to. Defaults to "127.0.0.1".
-        """
-        self.etcd_addr, self.etcd_proc, self.etcd_data_dir = start_etcd(host=host)
-        logger.info(f"EtcdUtil initialized with address: {self.etcd_addr}")
+    @ray.remote
+    class YRTensorTransportActor:
 
-    def close(self):
-        """Stop etcd process and clean up resources."""
-        if self.etcd_proc:
-            try:
-                self.etcd_proc.terminate()
-                self.etcd_proc.wait(timeout=5)
-                logger.info("Etcd process terminated successfully")
-                self.etcd_proc = None
-            except Exception as e:
-                logger.error(f"Error terminating etcd process: {e}")
+        def __init__(self, config: argparse.Namespace, node_ip: Optional[str] = None):
+            # Register transport in actor process
+            register_yr_tensor_transport(["npu", "cpu"])
+            self.config = config
+            self.node_ip = node_ip
+            self.data: Optional[torch.Tensor] = None
 
-        if self.etcd_data_dir and os.path.exists(self.etcd_data_dir):
-            try:
-                shutil.rmtree(self.etcd_data_dir, ignore_errors=True)
-                logger.info(f"Etcd data directory cleaned up: {self.etcd_data_dir}")
-            except Exception as e:
-                logger.error(f"Error cleaning up etcd data directory: {e}")
+            if self.config.device == "npu":
+                check_npu_is_available()
 
-    def __del__(self):
-        """Ensure etcd is closed when object is destroyed."""
-        try:
-            self.close()
-        except Exception:
-            pass
+        def generate_tensor(self) -> torch.Tensor:
+            # convert KB to number of float32 elements
+            seq_len = self.config.tensor_size_kb * 1000 // 4
+            self.data = torch.randn(
+                seq_len,
+                device=self.config.device,
+            )
+            logger.info(f"Generated tensor of shape {self.data.shape}")
+            return self.data
 
-
-@ray.remote
-class DataSystemActor:
-
-    def __init__(self, etcd_addr: str, node_ip: Optional[str] = None):
-        self.etcd_addr = etcd_addr
-        self.node_ip = node_ip
-        self.worker_host: Optional[str] = None
-        self.worker_port: Optional[int] = None
-        self.ds_started = False
-
-    def start_datasystem(self) -> tuple[Optional[str], Optional[int]]:
-        if self.ds_started:
-            logger.warning("DataSystem already started")
-            return self.worker_host, self.worker_port
-
-        try:
-            if self.node_ip is None:
-                self.worker_host, self.worker_port = start_datasystem(self.etcd_addr)
-            else:
-                self.worker_host, self.worker_port = start_datasystem(
-                    self.etcd_addr, worker_host=self.node_ip
+        @ray.method(tensor_transport="YR")
+        def transport_tensor_via_yr(self) -> torch.Tensor:
+            if self.data is None:
+                raise RuntimeError(
+                    "Tensor not generated yet. Call generate_tensor first."
                 )
+            return self.data
 
-            self.ds_started = True
-            logger.info(f"DataSystem started at {self.worker_host}:{self.worker_port}")
-            return self.worker_host, self.worker_port
-        except Exception as e:
-            logger.error(f"Failed to start datasystem: {e}")
-            raise
+        def recv_tensor(self, data: torch.Tensor) -> bool:
+            if isinstance(data, torch.Tensor):
+                return True
+            return False
 
-    def stop_datasystem(self):
-        if not self.ds_started:
-            logger.warning("DataSystem not started, skipping stop")
-            return
-
-        try:
-            ds_stop_cmd = [
-                "dscli",
-                "stop",
-                "--worker_address",
-                f"{self.worker_host}:{self.worker_port}",
-            ]
-            subprocess.run(ds_stop_cmd, check=True, timeout=90)
-            self.ds_started = False
-            logger.info("DataSystem stopped successfully")
-        except Exception as e:
-            logger.error(f"Failed to stop datasystem: {e}")
-
-    def get_datasystem_info(self) -> tuple[Optional[str], Optional[int]]:
-        if not self.ds_started:
-            raise RuntimeError("DataSystem not started yet")
-        return self.worker_host, self.worker_port
-
-
-@ray.remote
-class YRTensorTransportActor:
-
-    def __init__(self, config: argparse.Namespace, node_ip: Optional[str] = None):
-        register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
-        self.config = config
-        self.node_ip = node_ip
-        self.data: Optional[torch.Tensor] = None
-        self.ds_info: Optional[tuple[Optional[str], Optional[int]]] = None
-
-        # if host and port are provided via environment variables, we can skip starting datasystem automatically.
-        # TODO: But etcd will be still started by the test class.
-        host = os.getenv("YR_DS_WORKER_HOST")
-        port_str = os.getenv("YR_DS_WORKER_PORT")
-
-        if host and port_str:
-            self.ds_info = (host, int(port_str))
-            logger.info(f"DataSystem info loaded from environment: {self.ds_info}")
-
-        if self.config.device == "npu":
-            check_npu_is_available()
-
-    def setup_yr_env(self, ds_info: tuple[str, int]):
-        """setup environment variables for YR transport"""
-        if self.ds_info:
-            logger.warning("DataSystem info already set, skipping environment setup")
-            return
-        self.ds_info = ds_info
-        worker_host, worker_port = ds_info
-        os.environ["YR_DS_WORKER_HOST"] = worker_host
-        os.environ["YR_DS_WORKER_PORT"] = str(worker_port)
-        logger.info(f"DataSystem environment configured: {worker_host}:{worker_port}")
-
-    def generate_tensor(self) -> torch.Tensor:
-        # convert KB to number of float32 elements
-        seq_len = self.config.tensor_size_kb * 1000 // 4
-        self.data = torch.randn(
-            seq_len,
-            device=self.config.device,
-        )
-        logger.info(f"Generated tensor of shape {self.data.shape}")
-        return self.data
-
-    @ray.method(tensor_transport="YR")
-    def transport_tensor_via_yr(self) -> torch.Tensor:
-        if self.data is None:
-            raise RuntimeError("Tensor not generated yet. Call generate_tensor first.")
-        return self.data
-
-    def recv_tensor(self, data: torch.Tensor) -> bool:
-        if isinstance(data, torch.Tensor):
-            return True
-        return False
+    return YRTensorTransportActor
 
 
 class HCCLTransportTester:
@@ -317,69 +262,100 @@ class HCCLTransportTester:
 
 
 class YRDirectTransportTester(RayAscendBaseTester):
-    def __init__(self, config: argparse.Namespace, remote_mode: str = "local"):
+    """Tester for YR direct transport using register_yr_tensor_transport API.
+
+    Args:
+        config: Test configuration from argparse
+        init_mode: Initialization mode, "etcd" or "metastore"
+        remote_mode: Deployment mode, "local" or "remote"
+    """
+
+    def __init__(
+        self,
+        config: argparse.Namespace,
+        init_mode: str = "etcd",
+        remote_mode: str = "local",
+    ):
         self.config = config
+        self.init_mode = init_mode
         self.remote_mode = remote_mode
 
-        # Initialize etcd
-        etcd_host = HEAD_NODE_IP if remote_mode == "remote" else None
-        self.etcd_util = EtcdUtil(host=etcd_host) if etcd_host else EtcdUtil()
+        # etcd utility (only used when auto-starting etcd in CI scenarios)
+        self.etcd_util: Optional[EtcdUtil] = None
 
-        self.head_ds_actor: Optional[ray.actor.ActorHandle] = None
-        self.worker_ds_actor: Optional[ray.actor.ActorHandle] = None
-        self._initialize_data_system()
+        # Actor class (created after YR transport registration)
+        self._actor_class: Optional[type] = None
 
-    def _initialize_data_system(self):
-        "Initialize data system workers by DataSystemActor and get their info for later use in test actors."
-        if self.remote_mode == "remote":
-            logger.info("Initializing data system client in remote mode...")
-            # etcd is started by EtcdUtil; pass its address to actors
-            self.head_ds_actor = DataSystemActor.options(  # type: ignore[attr-defined]
-                resources={f"node:{HEAD_NODE_IP}": 0.001}
-            ).remote(self.etcd_util.etcd_addr, node_ip=HEAD_NODE_IP)
-            self.head_ds_info = ray.get(self.head_ds_actor.start_datasystem.remote())
-            self.worker_ds_actor = DataSystemActor.options(  # type: ignore[attr-defined]
-                resources={f"node:{WORKER_NODE_IP}": 0.001}
-            ).remote(
-                self.etcd_util.etcd_addr, node_ip=WORKER_NODE_IP
-            )
-            self.worker_ds_info = ray.get(
-                self.worker_ds_actor.start_datasystem.remote()
-            )
-        else:
-            logger.info("Initializing data system client in local mode...")
-            logger.info(f"etcd address is {self.etcd_util.etcd_addr}")
-            self.head_ds_actor = self.worker_ds_actor = DataSystemActor.remote(
-                self.etcd_util.etcd_addr
-            )
-            self.head_ds_info = self.worker_ds_info = ray.get(
-                self.head_ds_actor.start_datasystem.remote()
-            )
+        if self.config.device == "npu":
+            check_npu_is_available()
+
+        self._setup_environment()
+
+        # Create actor class after YR transport is registered
+        self._actor_class = _create_yr_tensor_transport_actor_class()
+
+    def _setup_environment(self):
+        """Set environment variables and initialize YR backend."""
+        # Set init mode
+        os.environ["YR_DS_INIT_MODE"] = self.init_mode
+
+        if self.init_mode == "etcd":
+            # Etcd mode: start etcd if not provided
+            etcd_address = os.getenv("YR_DS_ETCD_ADDRESS")
+            if etcd_address:
+                logger.info(f"Using user-provided etcd at {etcd_address}")
+            else:
+                # CI scenario: auto-start etcd
+                etcd_host = (
+                    HEAD_NODE_IP if self.remote_mode == "remote" else "127.0.0.1"
+                )
+                self.etcd_util = EtcdUtil(host=etcd_host)
+                os.environ["YR_DS_ETCD_ADDRESS"] = self.etcd_util.etcd_addr
+                logger.info(f"Auto-started etcd for CI at {self.etcd_util.etcd_addr}")
+
+        elif self.init_mode == "metastore":
+            # Metastore mode: set ports if not already set
+            if "YR_DS_WORKER_PORT" not in os.environ:
+                os.environ["YR_DS_WORKER_PORT"] = "31501"
+            if "YR_DS_METASTORE_PORT" not in os.environ:
+                os.environ["YR_DS_METASTORE_PORT"] = "2379"
+
+        # Set worker args if not already set
+        if "YR_DS_WORKER_ARGS" not in os.environ:
+            os.environ["YR_DS_WORKER_ARGS"] = "--shared_memory_size_mb 2048"
+
+        logger.info(
+            f"Initializing YR backend in {self.init_mode} mode "
+            f"(remote_mode={self.remote_mode})..."
+        )
+
+        # Initialize YR backend via register_yr_tensor_transport
+        register_yr_tensor_transport(["npu", "cpu"])
+        logger.info(f"YR {self.init_mode} backend initialized")
 
     def _initialize_test_actor(
         self,
     ) -> tuple[ray.actor.ActorHandle, ray.actor.ActorHandle]:
+        if self._actor_class is None:
+            raise RuntimeError("Actor class not initialized")
+
         if self.remote_mode == "remote":
-            sender_actor = YRTensorTransportActor.options(  # type: ignore[attr-defined]
+            sender_actor = self._actor_class.options(  # type: ignore[attr-defined]
                 resources={f"node:{HEAD_NODE_IP}": 0.001, "NPU": 1}
             ).remote(self.config, HEAD_NODE_IP)
 
-            receiver_actor = YRTensorTransportActor.options(  # type: ignore[attr-defined]
+            receiver_actor = self._actor_class.options(  # type: ignore[attr-defined]
                 resources={f"node:{WORKER_NODE_IP}": 0.001, "NPU": 1}
-            ).remote(
-                self.config, WORKER_NODE_IP
-            )
+            ).remote(self.config, WORKER_NODE_IP)
 
         else:
-            sender_actor = YRTensorTransportActor.options(resources={"NPU": 1}).remote(  # type: ignore[attr-defined]
+            sender_actor = self._actor_class.options(resources={"NPU": 1}).remote(  # type: ignore[attr-defined]
                 self.config
             )
-            receiver_actor = YRTensorTransportActor.options(resources={"NPU": 1}).remote(  # type: ignore[attr-defined]
+            receiver_actor = self._actor_class.options(resources={"NPU": 1}).remote(  # type: ignore[attr-defined]
                 self.config
             )
 
-        ray.get(receiver_actor.setup_yr_env.remote(self.worker_ds_info))
-        ray.get(sender_actor.setup_yr_env.remote(self.head_ds_info))
         return sender_actor, receiver_actor
 
     def run_test(self):
@@ -416,7 +392,7 @@ class YRDirectTransportTester(RayAscendBaseTester):
         )
 
         # Log performance summary
-        mode_name = f"{self.config.backend.upper()} {self.remote_mode.upper()}"
+        mode_name = f"{self.config.backend.upper()} {self.init_mode.upper()} {self.remote_mode.upper()}"
         self.log_performance_summary(
             logger=logger,
             test_name=mode_name,
@@ -427,14 +403,16 @@ class YRDirectTransportTester(RayAscendBaseTester):
         )
 
     def close(self):
-        """Close datasystem and cleanup etcd."""
-        if self.head_ds_actor:
-            ray.get(self.head_ds_actor.stop_datasystem.remote())
-        if self.worker_ds_actor and self.worker_ds_actor != self.head_ds_actor:
-            ray.get(self.worker_ds_actor.stop_datasystem.remote())
+        """Cleanup resources via cleanup_yr_resources and optionally etcd."""
+        logger.info(f"Cleaning up YR {self.init_mode} resources...")
+        try:
+            cleanup_yr_resources()
+            logger.info(f"YR {self.init_mode} resources cleaned up")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup YR resources: {e}")
 
-        # Clean up etcd
-        if hasattr(self, "etcd_util"):
+        # Cleanup auto-started etcd if applicable (CI scenario)
+        if self.etcd_util:
             self.etcd_util.close()
 
 
@@ -442,7 +420,11 @@ def main():
     config = parse_args()
 
     if config.backend == "yr":
-        tester = YRDirectTransportTester(config, remote_mode=config.placement)
+        tester = YRDirectTransportTester(
+            config,
+            init_mode=config.init_mode,
+            remote_mode=config.placement,
+        )
     elif config.backend == "hccl":
         raise NotImplementedError("HCCL transport test not implemented yet")
     else:

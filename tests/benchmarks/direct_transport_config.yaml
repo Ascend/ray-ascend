@@ -1,5 +1,7 @@
 # Transport backend: 'yr' for YR Direct Transport, 'hccl' for HCCL
 backend: yr
+# YR backend initialization mode: 'etcd' or 'metastore'
+init_mode: metastore
 # Test deployment mode: 'local' (same node) or 'remote' (distributed across nodes)
 placement: remote
 # Device to run tensors on: 'npu' or 'cpu'

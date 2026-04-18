@@ -40,7 +40,7 @@ test = [
 ]
 
 yr = [
-    "openyuanrong-datasystem>=0.6.3",
+    "openyuanrong-datasystem>=0.8.0",
     "torch==2.7.1+cpu; platform_machine == 'x86_64'",
     "torch==2.7.1; platform_machine == 'aarch64'",
     "torch-npu==2.7.1.post2",

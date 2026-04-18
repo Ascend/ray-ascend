@@ -1,9 +1,9 @@
 from .yr_utils import (
-    start_datasystem,
+    cleanup_yr_resources,
     start_etcd,
 )
 
 __all__ = [
-    "start_datasystem",
+    "cleanup_yr_resources",
     "start_etcd",
 ]

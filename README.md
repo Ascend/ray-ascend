@@ -75,6 +75,7 @@ collective.broadcast(tensor, src_rank=0, group_name="my_group")
 
 ```python
 import ray
+import torch
 from ray.util.collective import create_collective_group
 from ray.experimental import register_tensor_transport
 from ray_ascend.collective import HCCLGroup
@@ -110,12 +111,15 @@ provided) using Ray objects.
 
 ```python
 import ray
-from ray_ascend.direct_transport import YRTensorTransport
-from ray.experimental import register_tensor_transport
-register_tensor_transport("YR", ["npu", "cpu"], YRTensorTransport, torch.Tensor)
+from ray_ascend import register_yr_tensor_transport
+
+register_yr_tensor_transport(["npu", "cpu"])
 
 @ray.remote(resources={"NPU": 1})
 class RayActor:
+    def __init__(self):
+        register_yr_tensor_transport(["npu", "cpu"])
+
     @ray.method(tensor_transport="YR")
     def transfer_npu_tensor_via_hccs():
         return torch.zeros(1024, device="npu")
