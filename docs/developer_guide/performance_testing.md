@@ -2,15 +2,15 @@
 
 > Last updated: 03/30/2026
 
-This guide explains how to run performance tests for ray-ascend, including YuanRong (YR)
-Direct Transport and HCCL collective communication performance tests.
+This guide explains how to run performance tests for ray-ascend, including OpenYuanrong
+(YR) Direct Transport and HCCL collective communication performance tests.
 
 ## Overview
 
 The performance test suite is located in `tests/benchmarks/` and supports the following
 test types:
 
-- **YR Direct Transport**: Tests YuanRong direct tensor transport performance
+- **YR Direct Transport**: Tests YR direct tensor transport performance
 - **HCCL Collective Communication**: Tests HCCL collective operations performance
   (Coming Soon)
 
@@ -52,8 +52,8 @@ ______________________________________________________________________
 
 ### Overview
 
-Tests YuanRong direct tensor transport performance between Ray actors. This test
-measures the throughput and latency of tensor transfers using YR Direct Transport.
+Tests YR direct tensor transport performance between Ray actors. This test measures the
+throughput and latency of tensor transfers using YR Direct Transport.
 
 ### Additional Prerequisites
 

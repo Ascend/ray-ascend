@@ -42,7 +42,7 @@ jobs:
           curl -s -L https://mirrors.huaweicloud.com/etcd/v3.6.5/etcd-v3.6.5-linux-arm64.tar.gz -o etcd-v3.6.5-linux-arm64.tar.gz
           tar -xzf etcd-v3.6.5-linux-arm64.tar.gz
           mv etcd-v3.6.5-linux-arm64/etcd /usr/local/bin/
-      - name: Install yuanrong-datasystem
+      - name: Install openyuanrong-datasystem
         run: |
           pip${{ matrix.python-version }} install "openyuanrong-datasystem>=0.8.0"
       - name: Run performance test (etcd mode)

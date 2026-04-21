@@ -1,13 +1,13 @@
-# YuanRong Direct Tensor Transport
+# YR Direct Tensor Transport
 
 > _Last updated: 04/20/2026_
 
-YuanRong (YR) direct transport enables efficient zero-copy transfer of both CPU and NPU
-tensors between Ray actors.
+OpenYuanrong (YR) direct transport enables efficient zero-copy transfer of both CPU and
+NPU tensors between Ray actors.
 
 ## Features
 
-- **Zero-copy transfer**: Efficient memory sharing via OpenYuanRong DataSystem
+- **Zero-copy transfer**: Efficient memory sharing via OpenYuanrong DataSystem
 - **Dual device support**: Works with both CPU and NPU tensors
 - **One-sided communication**: Pull-based model for efficient transfers
 - **Automatic garbage collection**: Cleans up resources when no longer needed
@@ -17,7 +17,7 @@ tensors between Ray actors.
 Before using YR transport, ensure you have:
 
 1. Installed ray-ascend with YR support: `pip install "ray-ascend[yr]"`
-1. Installed dscli: `pip install openyuanrong-datasystem>=0.8.0`
+1. Installed dscli: `pip install "openyuanrong-datasystem>=0.8.0"`
 
 ## Ray Cluster Setup
 
@@ -121,6 +121,7 @@ from ray_ascend import register_yr_tensor_transport
 
 os.environ["YR_DS_INIT_MODE"] = "metastore"
 os.environ["YR_DS_WORKER_PORT"] = 31501
+os.environ["YR_DS_METASTORE_PORT"] = 2379
 os.environ["YR_DS_WORKER_ARGS"] = "--shared_memory_size_mb 16384 --remote_h2d_device_ids 0,1,2,3"
 
 ray.init()

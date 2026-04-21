@@ -140,7 +140,7 @@ def start_datasystem_worker(
     is_head: bool = False,
     worker_args: Optional[str] = None,
 ) -> str:
-    """Start Yuanrong datasystem worker (unified function with init_mode parameter).
+    """Start YR DS worker (unified function with init_mode parameter).
 
     Args:
         worker_address: Worker address in format "host:port"
@@ -158,7 +158,7 @@ def start_datasystem_worker(
     """
     if not shutil.which("dscli"):
         raise RuntimeError(
-            "dscli executable not found in PATH. Please run `pip install openyuanrong-datasystem>=0.8.0`."
+            'dscli executable not found in PATH. Please run `pip install "openyuanrong-datasystem>=0.8.0"`.'
         )
 
     # Build base command
@@ -191,9 +191,7 @@ def start_datasystem_worker(
     if worker_args:
         cmd.extend(worker_args.split())
 
-    logger.info(
-        f"Starting Yuanrong datasystem ({init_mode}, {node_type}) at {worker_address}"
-    )
+    logger.info(f"Starting YR DS worker ({init_mode}, {node_type}) at {worker_address}")
 
     # Build environment with ASCEND_RT_VISIBLE_DEVICES if specified (for NPU)
     env = None
@@ -219,18 +217,18 @@ def start_datasystem_worker(
 
     if ds_result.returncode == 0 and "[  OK  ]" in ds_result.stdout:
         logger.info(
-            f"dscli started Yuanrong datasystem ({init_mode}, {node_type}) at {worker_address} successfully"
+            f"dscli started YR DS worker ({init_mode}, {node_type}) at {worker_address} successfully"
         )
         return worker_address
 
     raise RuntimeError(
-        f"Failed to start datasystem ({init_mode}, {node_type}) at {worker_address}. "
+        f"Failed to start YR DS worker ({init_mode}, {node_type}) at {worker_address}. "
         f"Return code: {ds_result.returncode}, Output: {ds_result.stdout}"
     )
 
 
 def stop_datasystem_worker(worker_address: str) -> None:
-    """Stop Yuanrong datasystem worker.
+    """Stop YR DS worker.
 
     Args:
         worker_address: Worker address in format "host:port"
@@ -240,7 +238,7 @@ def stop_datasystem_worker(worker_address: str) -> None:
     """
     if not shutil.which("dscli"):
         raise RuntimeError(
-            "dscli executable not found in PATH. Please run `pip install openyuanrong-datasystem>=0.8.0`."
+            'dscli executable not found in PATH. Please run `pip install "openyuanrong-datasystem>=0.8.0"`.'
         )
 
     try:
@@ -303,7 +301,7 @@ def _parse_remote_h2d_device_ids(worker_args: str) -> Optional[str]:
 
 @ray.remote(num_cpus=0.1)
 class DataSystemActor:
-    """Ray actor to manage Yuanrong datasystem worker on a node.
+    """Ray actor to manage YR DS worker on a node.
 
     Supports both etcd and metastore initialization modes.
 
@@ -374,7 +372,7 @@ class DataSystemActor:
             RuntimeError: If dscli command fails
         """
         assert self._worker_address is not None
-        logger.info(f"Starting datasystem worker at {self._worker_address}...")
+        logger.info(f"Starting YR DS worker at {self._worker_address}...")
 
         worker_address = start_datasystem_worker(
             worker_address=self._worker_address,
@@ -392,7 +390,7 @@ class DataSystemActor:
         # Start reaper process for Parent Process Death Detection cleanup
         self._start_reaper(worker_address)
 
-        logger.info(f"Datasystem worker started successfully at {self._worker_address}")
+        logger.info(f"YR DS worker started successfully at {self._worker_address}")
         return worker_address
 
     def _start_reaper(self, worker_address: str) -> None:
@@ -510,7 +508,7 @@ class YRBackendCoordinator:
                     f"Failed to remove placement group after readiness timeout: {cleanup_error}"
                 )
             raise RuntimeError(
-                "Timed out waiting for Yuanrong placement group to become ready. "
+                "Timed out waiting for YR placement group to become ready. "
                 f"Requested strategy=STRICT_SPREAD, bundles={bundles}. "
                 "This may be due to insufficient cluster capacity."
             ) from e
@@ -522,7 +520,7 @@ class YRBackendCoordinator:
                     f"Failed to remove placement group after scheduling failure: {cleanup_error}"
                 )
             raise RuntimeError(
-                f"Failed to create Yuanrong placement group. "
+                f"Failed to create YR placement group. "
                 f"Requested strategy=STRICT_SPREAD, bundles={bundles}."
             ) from e
 
@@ -578,7 +576,7 @@ class YRBackendCoordinator:
         if self._placement_group:
             try:
                 ray.util.remove_placement_group(self._placement_group)
-                logger.info("Removed Yuanrong placement group")
+                logger.info("Removed YR placement group")
             except Exception as e:
                 logger.warning(f"Failed to remove placement group: {e}")
 

@@ -1,6 +1,6 @@
 # Installation
 
-> _Last updated: 03/24/2026_
+> _Last updated: 04/21/2026_
 
 ## Installation Options
 
@@ -12,9 +12,9 @@ Install the base package with HCCL collective communication support:
 pip install ray-ascend
 ```
 
-### With YuanRong Direct Transport Support
+### With YR Direct Transport Support
 
-Install with YuanRong (YR) direct tensor transport support:
+Install with OpenYuanrong (YR) direct tensor transport support:
 
 ```bash
 pip install "ray-ascend[yr]"
@@ -58,10 +58,13 @@ After CANN installation, confirm the toolkit path exists:
 ls /usr/local/Ascend/ascend-toolkit/latest
 ```
 
-## Etcd Setup (for YR Transport)
+## Etcd Setup (Optional, for YR Transport etcd Mode)
 
-OpenYuanRong DataSystem relies on etcd for cluster coordination. Download and install
-etcd from the official releases:
+OpenYuanrong DataSystem supports two initialization modes: `metastore` (default, no
+external dependencies) and `etcd` (requires external etcd service). Etcd setup is only
+needed if you choose to use etcd mode.
+
+Download and install etcd from the official releases:
 [ETCD GitHub Releases](https://github.com/etcd-io/etcd/releases)
 
 ```bash
@@ -83,12 +86,9 @@ etcdctl version
 
 ## Environment Variables for YR Transport
 
-Set these environment variables before using YuanRong direct transport:
-
-```bash
-export YR_DS_WORKER_HOST="127.0.0.1"
-export YR_DS_WORKER_PORT="31502"
-```
+For YR transport environment variables configuration, see
+[Environment Variables](yr_transport.md#environment-variables) in the YR Transport
+guide.
 
 Verify the YR installation by checking for the `dscli` command-line tool:
 

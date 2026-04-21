@@ -95,13 +95,11 @@ class YRTensorTransport(TensorTransportManager):
             else:
                 self._ds_client["cpu"] = CPUClientAdapter(host, port)
             self._ds_client[device_type].init()
-            logger.info(
-                f"Initialized YuanRong Datasystem client for {device_type} at {host}:{port}"
-            )
+            logger.info(f"Initialized YR DS client for {device_type} at {host}:{port}")
         except Exception as e:
             self._ds_client.pop(device_type, None)
             raise RuntimeError(
-                f"Failed to initialize YuanRong Datasystem client at {host}:{port}. Error: {e}"
+                f"Failed to initialize YR DS client at {host}:{port}. Error: {e}"
             ) from e
 
         return self._ds_client[device_type]
@@ -225,7 +223,7 @@ class YRTensorTransport(TensorTransportManager):
         communicator_metadata: CommunicatorMetadata,
     ):
         raise NotImplementedError(
-            "Datasystem transport does not support send_multiple_tensors,"
+            "YR DS transport does not support send_multiple_tensors,"
             "since it is a one-sided transport."
         )
 
@@ -255,4 +253,4 @@ class YRTensorTransport(TensorTransportManager):
         obj_id: str,
         communicator_metadata: CommunicatorMetadata,
     ):
-        raise NotImplementedError("YuanRong transport does not support aborting.")
+        raise NotImplementedError("YR transport does not support aborting.")

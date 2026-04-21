@@ -105,7 +105,7 @@ ray.get(result)
 
 ### Transport Ascend NPU Tensors via [HCCS](https://www.hiascend.com/document/detail/zh/Glossary/gls/gls_0001.html#ZH-CN_TOPIC_0000002210355753__section665813471086) and CPU Tensors via RDMA
 
-[OpenYuanRong DataSystem](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/index.html)
+[OpenYuanrong DataSystem](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/index.html)
 (`YR`) allows users to transport NPU tensors (via HCCS) and CPU tensors (via RDMA if
 provided) using Ray objects.
 

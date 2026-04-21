@@ -28,7 +28,7 @@ HCCLGroup(world_size: int, rank: int, group_name: str)
 
 ## YRTensorTransport
 
-The main class for YuanRong direct tensor transport.
+The main class for YR direct tensor transport.
 
 ### Constructor
 
