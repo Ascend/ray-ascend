@@ -2,13 +2,13 @@
 
 > _Last updated: 03/09/2026_
 
-We provide installation instructions for YuanRong direct transport and HCCL collective
+We provide installation instructions for YR direct transport and HCCL collective
 communication, and you can selectively install the relevant dependencies as needed.
 
 ### Install CANN
 
 If you have NPU devices and want to accelerate the transmission of NPU tensor by
-**YuanRong** or **HCCL**, you need to install **Ascend CANN Toolkit**.
+**OpenYuanrong** or **HCCL**, you need to install **Ascend CANN Toolkit**.
 
 > **CANN** (Compute Architecture for Neural Networks) is a heterogeneous computing
 > architecture launched by Huawei for AI scenarios.
@@ -70,7 +70,7 @@ python -m build --wheel
 pip install dist/*.whl
 ```
 
-## Install ray-ascend with YuanRong
+## Install ray-ascend with OpenYuanrong
 
 If you want to use
 [YR](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/index.html)
@@ -90,10 +90,13 @@ Verify the installation by checking for the `dscli` command-line tool.
 dscli --version
 ```
 
-### Install etcd
+### Install etcd (Optional, for etcd Mode)
 
-OpenYuanRong DataSystem relies on etcd for cluster coordination. Download and install
-etcd from the official releases:
+OpenYuanrong DataSystem supports two initialization modes: `metastore` (default, no
+external dependencies) and `etcd` (requires external etcd service). Etcd setup is only
+needed if you choose to use etcd mode.
+
+Download and install etcd from the official releases:
 [ETCD GitHub Releases](https://github.com/etcd-io/etcd/releases)
 
 ```bash

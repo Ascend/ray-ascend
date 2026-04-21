@@ -12,8 +12,8 @@ of ray-ascend's key features:
 
 - **HCCL Collective Communication**: Distributed collective operations across Ray actors
   using Huawei Collective Communication Library
-- **YuanRong Direct Transport**: Efficient zero-copy transfer of CPU and NPU tensors
-  between Ray actors
+- **YR Direct Transport**: Efficient zero-copy transfer of CPU and NPU tensors between
+  Ray actors
 
 ## Prerequisites
 
@@ -30,7 +30,7 @@ Optional dependencies for specific features:
 ## Quick Start
 
 ```bash
-# Install with YuanRong support
+# Install with YR support
 pip install "ray-ascend[yr]"
 ```
 
@@ -38,7 +38,7 @@ pip install "ray-ascend[yr]"
 
 - [Installation](installation.md): Detailed installation and setup instructions
 - [HCCL Collective Communication](hccl_collective.md): Collective operations guide
-- [YuanRong Direct Transport](yr_transport.md): Tensor transport guide
+- [YR Direct Transport](yr_transport.md): Tensor transport guide
 - [API Reference](api_reference.md): Complete API documentation
 - [Best Practices](best_practices.md): Best practices, troubleshooting, and FAQ
 
@@ -46,6 +46,6 @@ pip install "ray-ascend[yr]"
 
 - [Ray Documentation](https://docs.ray.io/)
 - [Ascend Documentation](https://www.hiascend.com/)
-- [OpenYuanRong DataSystem Documentation](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/)
+- [OpenYuanrong DataSystem Documentation](https://pages.openeuler.openatom.cn/openyuanrong-datasystem/docs/zh-cn/latest/)
 - [GitHub Repository](https://github.com/Ascend/ray-ascend)
 - [Developer Guide](../developer_guide/index.md)

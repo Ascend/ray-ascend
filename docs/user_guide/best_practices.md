@@ -51,7 +51,7 @@ current when the `HCCLGroup` was created.
 
 ### YR Transport Issues
 
-**Problem**: "YuanRong datasystem worker env not set"
+**Problem**: "YR DS worker env not set"
 
 **Solution**: Set the required environment variables:
 
@@ -68,7 +68,7 @@ export YR_DS_WORKER_PORT="31502"
 pip install "ray-ascend[yr]"
 ```
 
-**Problem**: "Failed to initialize YuanRong Datasystem client"
+**Problem**: "Failed to initialize YR DS client"
 
 **Solution**:
 

@@ -32,8 +32,7 @@ Before starting development, you need to set up your environment. Refer to
   tensor for transmission.
 - **Choose Installation Type**:
     - **Basic Installation**: `pip install -e .`
-    - **With YR Support**: `pip install -e ".[yr]"` (includes YuanRong direct tensor
-      transport)
+    - **With YR Support**: `pip install -e ".[yr]"` (includes YR direct tensor transport)
     - **Full Installation**: `pip install -e ".[all]"` (all features for development and
       testing)
 
@@ -61,7 +60,7 @@ The ray-ascend project is organized as follows:
 ```
 ray_ascend/
 ├── collective/              # HCCL collective communication
-└── direct_transport/        # YuanRong direct tensor transport
+└── direct_transport/        # YR direct tensor transport
 
 
 tests/
@@ -73,7 +72,7 @@ tests/
 **Main Components:**
 
 - **collective/**: HCCL-based collective communication group implementation
-- **direct_transport/**: YuanRong direct tensor transport implementation
+- **direct_transport/**: YR direct tensor transport implementation
 - **tests/**: Comprehensive test suite using pytest
 
 ## Coding Standards and Submission
@@ -194,7 +193,7 @@ Before submitting, please ensure:
 
 ## Performance Testing
 
-For instructions on running performance benchmarks for YuanRong Direct Transport, see
+For instructions on running performance benchmarks for YR Direct Transport, see
 [Performance Testing Guide](performance_testing.md).
 
 ## Documentation
