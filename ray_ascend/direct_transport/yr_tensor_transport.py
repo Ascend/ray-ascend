@@ -1,5 +1,4 @@
 import logging
-import os
 import pickle
 import uuid
 from dataclasses import dataclass, field
@@ -17,6 +16,7 @@ from ray_ascend.direct_transport.yr_tensor_transport_util import (
     CPUClientAdapter,
     NPUClientAdapter,
 )
+from ray_ascend.utils.yr_utils import get_yr_backend_info
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +41,10 @@ class YRTransportMetadata(TensorTransportMetadata):
 
 class YRTensorTransport(TensorTransportManager):
     def __init__(self):
-        """
-        Prepares the env for lazily initializing the YR DS client.
-        """
-        self._ds_client = dict()
-        self._ds_worker_host = None
-        self._ds_worker_port = None
+        """Prepares for lazy init YR DS client. Config fetched from coordinator."""
+        self._ds_client: dict = {}
+        self._ds_worker_host: Optional[str] = None
+        self._ds_worker_port: Optional[int] = None
 
     def tensor_transport_backend(self) -> str:
         return "YR"
@@ -59,46 +57,51 @@ class YRTensorTransport(TensorTransportManager):
     def can_abort_transport() -> bool:
         return False
 
-    def get_ds_client(self, device_type: str):
+    def _get_worker_address(self) -> tuple[str, int]:
+        """Get worker address from coordinator.
+
+        Returns:
+            Tuple of (host, port) for this node's DS worker.
+
+        Raises:
+            RuntimeError: If worker address not found in coordinator.
         """
-        Creates a YR DS client if it does not already exist.
-        """
+        my_node_ip = ray.util.get_node_ip_address()
+        backend_info = get_yr_backend_info()
+
+        node_worker_addresses = backend_info.get("node_worker_addresses", {})
+        worker_addr = node_worker_addresses.get(my_node_ip)
+        if not worker_addr:
+            raise RuntimeError(
+                f"Node {my_node_ip} not found in worker addresses. "
+                f"Available nodes: {list(node_worker_addresses.keys())}"
+            )
+
+        host, port_str = worker_addr.split(":")
+        return host, int(port_str)
+
+    def get_ds_client(self, device_type: str) -> Any:
+        """Creates a YR DS client if it does not already exist."""
         if self._ds_client.get(device_type) is not None:
             return self._ds_client[device_type]
 
-        self._ds_worker_host = os.getenv("YR_DS_WORKER_HOST")
-        port = os.getenv("YR_DS_WORKER_PORT")
-        if not self._ds_worker_host or not port:
-            raise RuntimeError(
-                "YuanRong datasystem worker env not set. "
-                "Please set YR_DS_WORKER_HOST and YR_DS_WORKER_PORT."
-            )
-        self._ds_worker_port = int(port)
-        logger.info(
-            f"Datasystem worker address: {self._ds_worker_host}:{self._ds_worker_port}"
-        )
+        host, port = self._get_worker_address()
+        self._ds_worker_host = host
+        self._ds_worker_port = port
 
         try:
             if device_type == "npu":
-                self._ds_client["npu"] = NPUClientAdapter(
-                    self._ds_worker_host, self._ds_worker_port
-                )
+                self._ds_client["npu"] = NPUClientAdapter(host, port)
             else:
-                self._ds_client["cpu"] = CPUClientAdapter(
-                    self._ds_worker_host, self._ds_worker_port
-                )
+                self._ds_client["cpu"] = CPUClientAdapter(host, port)
             self._ds_client[device_type].init()
             logger.info(
-                f"Succeed to initialize YuanRong Datasystem client for "
-                f"device type {device_type} "
-                f"at {self._ds_worker_host}:{self._ds_worker_port}"
+                f"Initialized YuanRong Datasystem client for {device_type} at {host}:{port}"
             )
         except Exception as e:
             self._ds_client.pop(device_type, None)
             raise RuntimeError(
-                f"Failed to initialize YuanRong Datasystem client at"
-                f"{self._ds_worker_host}:{self._ds_worker_port}. "
-                f"Error: {e}"
+                f"Failed to initialize YuanRong Datasystem client at {host}:{port}. Error: {e}"
             ) from e
 
         return self._ds_client[device_type]
@@ -189,18 +192,12 @@ class YRTensorTransport(TensorTransportManager):
         communicator_metadata: CommunicatorMetadata,
         target_buffers: Optional[List[Any]] = None,
     ) -> List["torch.Tensor"]:
-        # Use pre-allocated target buffers if provided, otherwise create empty tensors
-        if target_buffers is not None:
-            tensors = target_buffers
-        else:
-            tensors = []
-            device = tensor_transport_metadata.tensor_device
-            for meta_data in tensor_transport_metadata.tensor_meta:
-                shape, dtype = meta_data
-                import torch
+        from ray.experimental.rdt.util import create_empty_tensors_from_metadata
 
-                tensor = torch.empty(size=shape, dtype=dtype, device=device)
-                tensors.append(tensor)
+        # Use pre-allocated target buffers if provided, otherwise create empty tensors
+        tensors = target_buffers or create_empty_tensors_from_metadata(
+            tensor_transport_metadata
+        )
 
         assert isinstance(tensor_transport_metadata, YRTransportMetadata)
         assert isinstance(communicator_metadata, YRCommunicatorMetadata)

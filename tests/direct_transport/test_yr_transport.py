@@ -101,6 +101,11 @@ class TestCPUTransport:
                 "ray_ascend.direct_transport.yr_tensor_transport_util.CPUClientAdapter.unpack_from",
                 return_value=[b"decoded_mock_data"],
             ),
+            patch.object(
+                transport,
+                "_get_worker_address",
+                return_value=("127.0.0.1", 31502),
+            ),
         ):
             yield transport, mock_client, decoder
 
@@ -191,6 +196,11 @@ class TestNPUTransport:
             patch(
                 "ray_ascend.direct_transport.yr_tensor_transport_util.NPU_AVAILABLE",
                 True,
+            ),
+            patch.object(
+                transport,
+                "_get_worker_address",
+                return_value=("127.0.0.1", 31502),
             ),
         ):
             yield transport, mock_client

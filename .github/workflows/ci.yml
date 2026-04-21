@@ -44,13 +44,22 @@ jobs:
           mv etcd-v3.6.5-linux-arm64/etcd /usr/local/bin/
       - name: Install yuanrong-datasystem
         run: |
-          pip${{ matrix.python-version }} install openyuanrong-datasystem
-      - name: Run performance test (use npu tensors in the local node)
+          pip${{ matrix.python-version }} install "openyuanrong-datasystem>=0.8.0"
+      - name: Run performance test (etcd mode)
         run: |
           echo "start ray cluster"
           ray start --head
-          echo "Running direct_transport_perftest.py"
-          python${{ matrix.python-version }} tests/benchmarks/direct_transport_perftest.py --backend=yr --placement=local --device=npu
+          echo "Running direct_transport_perftest.py (etcd mode)"
+          python${{ matrix.python-version }} tests/benchmarks/direct_transport_perftest.py --backend=yr --placement=local --device=npu --init-mode=etcd
+          echo "stop ray cluster"
+          ray stop
+
+      - name: Run performance test (metastore mode)
+        run: |
+          echo "start ray cluster"
+          ray start --head
+          echo "Running direct_transport_perftest.py (metastore mode)"
+          python${{ matrix.python-version }} tests/benchmarks/direct_transport_perftest.py --backend=yr --placement=local --device=npu --init-mode=metastore
           echo "stop ray cluster"
           ray stop
 
