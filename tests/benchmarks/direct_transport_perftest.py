@@ -149,7 +149,7 @@ def parse_args() -> argparse.Namespace:
             "help": "IP address of the worker node. Required in 'remote' mode.",
         },
         {
-            "name": "--tensor-num-elements",
+            "name": "--tensor-count",
             "type": int,
             "default": 1,
             "help": "Number of tensors to transport in the list.",
@@ -216,8 +216,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--warmup-times cannot be negative")
     if final_args.tensor_size_kb <= 0:
         parser.error("--tensor-size-kb must be a positive integer")
-    if final_args.tensor_num_elements <= 0:
-        parser.error("--tensor-num-elements must be a positive integer")
+    if final_args.tensor_count <= 0:
+        parser.error("--tensor-count must be a positive integer")
 
     logger.info(
         f"Test configuration:\n{yaml.dump(vars(final_args), default_flow_style=False)}"
@@ -254,13 +254,13 @@ def _create_yr_tensor_transport_actor_class():
                     seq_len,
                     device=self.config.device,
                 )
-                if self.config.tensor_num_elements == 1
+                if self.config.tensor_count == 1
                 else [
                     torch.randn(
                         seq_len,
                         device=self.config.device,
                     )
-                    for _ in range(self.config.tensor_num_elements)
+                    for _ in range(self.config.tensor_count)
                 ]
             )
             if isinstance(self.data, Tensor):
@@ -392,7 +392,7 @@ class YRDirectTransportTester(RayAscendBaseTester):
     def run_test(self):
         sender_actor, receiver_actor = self._initialize_test_actor()
         total_data_size_gb = (
-            self.config.tensor_num_elements * self.config.tensor_size_kb / (1000 * 1000)
+            self.config.tensor_count * self.config.tensor_size_kb / (1000 * 1000)
         )  # Convert KB to GB
 
         # warm up
