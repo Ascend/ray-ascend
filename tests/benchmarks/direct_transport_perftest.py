@@ -248,7 +248,7 @@ def _create_yr_tensor_transport_actor_class():
 
         def generate_tensor(self):
             # convert KB to number of float32 elements
-            seq_len = self.config.tensor_size_kb * 1000 // 4
+            seq_len = self.config.tensor_size_kb * 1024 // 4
             self.data = (
                 torch.randn(
                     seq_len,
@@ -392,7 +392,7 @@ class YRDirectTransportTester(RayAscendBaseTester):
     def run_test(self):
         sender_actor, receiver_actor = self._initialize_test_actor()
         total_data_size_gb = (
-            self.config.tensor_count * self.config.tensor_size_kb / (1000 * 1000)
+            self.config.tensor_count * self.config.tensor_size_kb / (1024 * 1024)
         )  # Convert KB to GB
 
         # warm up
