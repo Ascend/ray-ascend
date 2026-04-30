@@ -10,7 +10,9 @@ device: npu
 head_node_ip: "10.170.27.237"
 # IP address of the worker node (required for remote mode)
 worker_node_ip: "10.170.27.158"
-# Total tensor size in KB (converted to float32 elements)
+# Number of tensors to transport in the list
+tensor_count: 5
+# Size of each tensor in KB (converted to float32 elements)
 tensor_size_kb: 1000
 # Number of warmup iterations before measurement
 warmup_times: 5

@@ -5,11 +5,12 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import ray
 import torch
 import yaml
+from torch import Tensor
 
 from ray_ascend import register_yr_tensor_transport
 from ray_ascend.utils import cleanup_yr_resources, start_etcd
@@ -148,10 +149,16 @@ def parse_args() -> argparse.Namespace:
             "help": "IP address of the worker node. Required in 'remote' mode.",
         },
         {
+            "name": "--tensor-count",
+            "type": int,
+            "default": 1,
+            "help": "Number of tensors to transport in the list.",
+        },
+        {
             "name": "--tensor-size-kb",
             "type": int,
             "default": 1024,
-            "help": "Total number of elements in the tensor to transport (default: 1024).",
+            "help": "Size of each tensor in KB.",
         },
         {
             "name": "--warmup-times",
@@ -203,6 +210,14 @@ def parse_args() -> argparse.Namespace:
         global HEAD_NODE_IP, WORKER_NODE_IP
         HEAD_NODE_IP = final_args.head_node_ip
         WORKER_NODE_IP = final_args.worker_node_ip
+    if final_args.count <= 0:
+        parser.error("--count must be a positive integer")
+    if final_args.warmup_times < 0:
+        parser.error("--warmup-times cannot be negative")
+    if final_args.tensor_size_kb <= 0:
+        parser.error("--tensor-size-kb must be a positive integer")
+    if final_args.tensor_count <= 0:
+        parser.error("--tensor-count must be a positive integer")
 
     logger.info(
         f"Test configuration:\n{yaml.dump(vars(final_args), default_flow_style=False)}"
@@ -226,31 +241,47 @@ def _create_yr_tensor_transport_actor_class():
             register_yr_tensor_transport(["npu", "cpu"])
             self.config = config
             self.node_ip = node_ip
-            self.data: Optional[torch.Tensor] = None
+            self.data: Optional[Union[Tensor, list[Tensor]]] = None
 
             if self.config.device == "npu":
                 check_npu_is_available()
 
-        def generate_tensor(self) -> torch.Tensor:
+        def generate_tensor(self):
             # convert KB to number of float32 elements
-            seq_len = self.config.tensor_size_kb * 1000 // 4
-            self.data = torch.randn(
-                seq_len,
-                device=self.config.device,
+            seq_len = self.config.tensor_size_kb * 1024 // 4
+            self.data = (
+                torch.randn(
+                    seq_len,
+                    device=self.config.device,
+                )
+                if self.config.tensor_count == 1
+                else [
+                    torch.randn(
+                        seq_len,
+                        device=self.config.device,
+                    )
+                    for _ in range(self.config.tensor_count)
+                ]
             )
-            logger.info(f"Generated tensor of shape {self.data.shape}")
-            return self.data
+            if isinstance(self.data, Tensor):
+                logger.info(f"Generated tensor of shape {self.data.shape}")
+            else:
+                logger.info(
+                    f"Generated {len(self.data)} tensors, each of shape {self.data[0].shape}"
+                )
 
         @ray.method(tensor_transport="YR")
-        def transport_tensor_via_yr(self) -> torch.Tensor:
+        def transport_tensor_via_yr(self) -> Union[Tensor, list[Tensor]]:
             if self.data is None:
                 raise RuntimeError(
                     "Tensor not generated yet. Call generate_tensor first."
                 )
             return self.data
 
-        def recv_tensor(self, data: torch.Tensor) -> bool:
-            if isinstance(data, torch.Tensor):
+        def recv_tensor(self, data: Union[Tensor, list[Tensor]]) -> bool:
+            if isinstance(data, Tensor) or (
+                isinstance(data, list) and all(isinstance(t, Tensor) for t in data)
+            ):
                 return True
             return False
 
@@ -360,8 +391,8 @@ class YRDirectTransportTester(RayAscendBaseTester):
 
     def run_test(self):
         sender_actor, receiver_actor = self._initialize_test_actor()
-        total_data_size_gb = self.config.tensor_size_kb / (
-            1000 * 1000
+        total_data_size_gb = (
+            self.config.tensor_count * self.config.tensor_size_kb / (1024 * 1024)
         )  # Convert KB to GB
 
         # warm up

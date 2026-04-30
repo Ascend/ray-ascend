@@ -68,17 +68,19 @@ lifecycle management automatically.
 
 ### Parameters
 
-| Parameter          | Type | Choices       | Default  | Description                                                  |
-| ------------------ | ---- | ------------- | -------- | ------------------------------------------------------------ |
-| `--backend`        | str  | yr, hccl      | required | Transport backend                                            |
-| `--placement`      | str  | local, remote | local    | Test deployment mode                                         |
-| `--device`         | str  | npu, cpu      | cpu      | Device to run tensors on                                     |
-| `--head-node-ip`   | str  | -             | -        | IP address of Ray head node (required for remote mode)       |
-| `--worker-node-ip` | str  | -             | -        | IP address of worker node (required for remote mode)         |
-| `--tensor-size-kb` | int  | -             | 1024     | Total number of KB in tensor (converted to float32 elements) |
-| `--warmup-times`   | int  | -             | 2        | Number of warmup iterations before measurement               |
-| `--count`          | int  | -             | 5        | Number of test iterations (results are averaged)             |
-| `--config-file`    | str  | -             | -        | Path to YAML config file                                     |
+| Parameter          | Type | Choices         | Default  | Description                                               |
+| ------------------ | ---- | --------------- | -------- | --------------------------------------------------------- |
+| `--backend`        | str  | yr, hccl        | required | Transport backend                                         |
+| `--init-mode`      | str  | etcd, metastore | etcd     | YR backend initialization mode                            |
+| `--placement`      | str  | local, remote   | local    | Test deployment mode                                      |
+| `--device`         | str  | npu, cpu        | cpu      | Device to run tensors on                                  |
+| `--head-node-ip`   | str  | -               | -        | IP address of Ray head node (required for remote mode)    |
+| `--worker-node-ip` | str  | -               | -        | IP address of worker node (required for remote mode)      |
+| `--tensor-count`   | int  | -               | 1        | Number of tensors to transport in the list                |
+| `--tensor-size-kb` | int  | -               | 1024     | Size of each tensor in KB (converted to float32 elements) |
+| `--warmup-times`   | int  | -               | 2        | Number of warmup iterations before measurement            |
+| `--count`          | int  | -               | 5        | Number of test iterations (results are averaged)          |
+| `--config-file`    | str  | -               | -        | Path to YAML config file                                  |
 
 ### Running the Test
 
@@ -93,11 +95,23 @@ python tests/benchmarks/direct_transport_perftest.py --backend yr
 Detailed settings:
 
 ```bash
-# Local mode
+# Local mode with single tensor
 python tests/benchmarks/direct_transport_perftest.py \
   --backend yr \
   --placement local \
   --device cpu \
+  --tensor-count 1 \
+  --tensor-size-kb 1024 \
+  --warmup-times 2 \
+  --count 5
+
+
+# Local mode with tensor list (transport 10 tensors)
+python tests/benchmarks/direct_transport_perftest.py \
+  --backend yr \
+  --placement local \
+  --device cpu \
+  --tensor-count 10 \
   --tensor-size-kb 1024 \
   --warmup-times 2 \
   --count 5
@@ -110,6 +124,7 @@ python tests/benchmarks/direct_transport_perftest.py \
   --device cpu \
   --head_node_ip NODE_A\
   --worker_node_ip NODE_B\
+  --tensor-count 1 \
   --tensor-size-kb 1024 \
   --warmup-times 2 \
   --count 5
@@ -122,6 +137,8 @@ Create a YAML configuration file (e.g., `config.yaml`):
 ```yaml
 # Transport backend: 'yr' for YR Direct Transport, 'hccl' for HCCL
 backend: yr
+# YR backend initialization mode: 'etcd' or 'metastore'
+init_mode: metastore
 # Test deployment mode: 'local' (same node) or 'remote' (distributed)
 placement: remote
 # Device to run tensors on: 'npu' or 'cpu'
@@ -130,7 +147,9 @@ device: npu
 head_node_ip: NODE_A
 # IP address of the worker node (required for remote mode)
 worker_node_ip: NODE_B
-# Total tensor size in KB
+# Number of tensors to transport in the list
+tensor_count: 1
+# Size of each tensor in KB
 tensor_size_kb: 1000
 # Number of warmup iterations before measurement
 warmup_times: 5

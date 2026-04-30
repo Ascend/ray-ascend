@@ -121,16 +121,16 @@ class RayActor:
         register_yr_tensor_transport(["npu", "cpu"])
 
     @ray.method(tensor_transport="YR")
-    def transfer_npu_tensor_via_hccs():
+    def transfer_npu_tensor_via_hccs(self):
         return torch.zeros(1024, device="npu")
 
     @ray.method(tensor_transport="YR")
-    def transfer_cpu_tensor_via_rdma():
+    def transfer_cpu_tensor_via_rdma(self):
         return torch.zeros(1024)
 
 sender = RayActor.remote()
-npu_tensor = ray.get(sender.transfer_npu_tensor_via_hccs())
-cpu_tensor = ray.get(sender.transfer_cpu_tensor_via_rdma())
+npu_tensor = ray.get(sender.transfer_npu_tensor_via_hccs.remote())
+cpu_tensor = ray.get(sender.transfer_cpu_tensor_via_rdma.remote())
 ```
 
 ## Contributing
