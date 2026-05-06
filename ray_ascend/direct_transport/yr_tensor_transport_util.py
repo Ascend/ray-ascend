@@ -213,8 +213,11 @@ class CPUClientAdapter(BaseDSAdapter):
             tensors[i] = _decoder.decode(self.unpack_from(buffer))
 
     def delete(self, keys):
-        failed_keys = self._client.delete(keys=keys)
-        raise_if_failed(failed_keys, "delete")
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            batch_keys = keys[i : i + batch_size]
+            failed_keys = self._client.delete(keys=batch_keys)
+            raise_if_failed(failed_keys, "delete")
 
     def health_check(self):
         return self._client.health_check().is_ok()
@@ -257,5 +260,8 @@ class NPUClientAdapter(BaseDSAdapter):
             raise_if_failed(failed_keys, "get")
 
     def delete(self, keys):
-        failed_keys = self._client.dev_delete(keys=keys)
-        raise_if_failed(failed_keys, "delete")
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            batch_keys = keys[i : i + batch_size]
+            failed_keys = self._client.dev_delete(keys=batch_keys)
+            raise_if_failed(failed_keys, "delete")
