@@ -70,6 +70,7 @@ class CPUClientAdapter(BaseDSAdapter):
     ENTRY_SIZE = struct.calcsize(ENTRY_FMT)
 
     DS_MAX_WORKERS = 4
+    MAX_KEYS_PER_BATCH = 10000
 
     def __init__(self, host, port):
         if not YR_AVAILABLE:
@@ -165,6 +166,14 @@ class CPUClientAdapter(BaseDSAdapter):
             keys (list[str]): List of string keys under which the objects will be stored.
             tensors (list[torch.Tensor]): List of tensors to store.
         """
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            batch_keys = keys[i : i + batch_size]
+            batch_tensors = tensors[i : i + batch_size]
+            self._put_batch(batch_keys, batch_tensors)
+
+    def _put_batch(self, keys: list[str], tensors: list[torch.Tensor]):
+        """Process a single batch of put operations."""
         items_list = [[memoryview(b) for b in _encoder.encode(obj)] for obj in tensors]
         packed_sizes = [self.calc_packed_size(items) for items in items_list]
         buffers = self._client.mcreate(keys, packed_sizes)
@@ -189,6 +198,14 @@ class CPUClientAdapter(BaseDSAdapter):
             tensors (list[torch.Tensor]): Pre-allocated list of tensors to hold the retrieved data. The length of this list should match the number of keys.
 
         """
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            batch_keys = keys[i : i + batch_size]
+            batch_tensors = tensors[i : i + batch_size]
+            self._get_batch(batch_keys, batch_tensors)
+
+    def _get_batch(self, keys: list[str], tensors: list[torch.Tensor]):
+        """Process a single batch of get operations."""
         buffers = self._client.get_buffers(keys)
         for i, buffer in enumerate(buffers):
             if buffer is None:
@@ -204,6 +221,8 @@ class CPUClientAdapter(BaseDSAdapter):
 
 
 class NPUClientAdapter(BaseDSAdapter):
+    MAX_KEYS_PER_BATCH = 10000
+
     def __init__(self, host, port):
         if not NPU_AVAILABLE:
             raise RuntimeError(
@@ -222,12 +241,20 @@ class NPUClientAdapter(BaseDSAdapter):
         self._client.init()
 
     def put(self, keys, tensors):
-        failed_keys = self._client.dev_mset(keys=keys, tensors=tensors)
-        raise_if_failed(failed_keys, "put")
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            batch_keys = keys[i : i + batch_size]
+            batch_tensors = tensors[i : i + batch_size]
+            failed_keys = self._client.dev_mset(keys=batch_keys, tensors=batch_tensors)
+            raise_if_failed(failed_keys, "put")
 
     def get(self, keys, tensors):
-        failed_keys = self._client.dev_mget(keys=keys, tensors=tensors)
-        raise_if_failed(failed_keys, "get")
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            batch_keys = keys[i : i + batch_size]
+            batch_tensors = tensors[i : i + batch_size]
+            failed_keys = self._client.dev_mget(keys=batch_keys, tensors=batch_tensors)
+            raise_if_failed(failed_keys, "get")
 
     def delete(self, keys):
         failed_keys = self._client.dev_delete(keys=keys)
