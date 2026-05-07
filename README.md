@@ -55,9 +55,14 @@ pip install "ray-ascend[yr]"
 ```python
 import ray
 from ray.util import collective
-from ray_ascend.collective import HCCLGroup
+from ray_ascend import register_hccl_collective_backend
 
-ray.register_collective_backend("HCCL", HCCLGroup)
+register_hccl_collective_backend()
+
+@ray.remote(resources={"NPU": 1})
+class RayActor:
+    def __init__(self):
+        register_hccl_collective_backend()
 
 collective.create_collective_group(
     actors,
@@ -77,16 +82,15 @@ collective.broadcast(tensor, src_rank=0, group_name="my_group")
 import ray
 import torch
 from ray.util.collective import create_collective_group
-from ray.experimental import register_tensor_transport
-from ray_ascend.collective import HCCLGroup
-from ray_ascend.direct_transport import HCCLTensorTransport
+from ray_ascend import register_hccl_tensor_transport
 
-ray.register_collective_backend("HCCL", HCCLGroup)
-register_tensor_transport("HCCL", ["npu"], HCCLTensorTransport, torch.Tensor)
-
+register_hccl_tensor_transport()
 
 @ray.remote(resources={"NPU": 1})
 class RayActor:
+    def __init__(self):
+        register_hccl_tensor_transport()
+
     @ray.method(tensor_transport="HCCL")
     def random_tensor(self):
         return torch.zeros(1024, device="npu")

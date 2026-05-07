@@ -9,6 +9,8 @@ __all__ = [
     "__version__",
     "__commit__",
     "register_yr_tensor_transport",
+    "register_hccl_collective_backend",
+    "register_hccl_tensor_transport",
 ]
 
 __commit__ = _version.commit
@@ -86,3 +88,66 @@ def register_yr_tensor_transport(devices=["npu", "cpu"]) -> None:
 
     # Register tensor transport
     register_tensor_transport("YR", devices, YRTensorTransport, torch.Tensor)
+
+
+def register_hccl_collective_backend() -> None:
+    """
+    Register HCCL collective backend for Ray.
+
+    This function must be called in each Ray worker/actor process
+    before using HCCL collective operations.
+
+    Example:
+        from ray.util import collective
+        from ray_ascend import register_hccl_collective_backend
+
+        register_hccl_collective_backend()
+
+        @ray.remote(resources={"NPU": 1})
+        class RayActor:
+            def __init__(self):
+                register_hccl_collective_backend()
+
+        collective.create_collective_group(
+            actors,
+            len(actors),
+            list(range(0, len(actors))),
+            backend="HCCL",
+            group_name="my_group",
+        )
+    """
+    from ray.util.collective.backend_registry import register_collective_backend
+
+    from .collective.hccl_collective_group import HCCLGroup
+
+    register_collective_backend("HCCL", HCCLGroup)
+
+
+def register_hccl_tensor_transport() -> None:
+    """
+    Register HCCL backend and tensor transport for Ray.
+
+    This function must be called in each Ray worker/actor process
+    before using HCCL collective operations or tensor transport.
+
+    Example:
+        from ray_ascend import register_hccl_tensor_transport
+
+        register_hccl_tensor_transport()
+
+        @ray.remote(resources={"NPU": 1})
+        class RayActor:
+            def __init__(self):
+                register_hccl_tensor_transport()
+
+            @ray.method(tensor_transport="HCCL")
+            def transfer_npu_tensor_via_hccs(self):
+                return torch.tensor([1, 2, 3]).npu()
+    """
+    import torch
+    from ray.experimental import register_tensor_transport
+
+    from .direct_transport.hccl_tensor_transport import HCCLTensorTransport
+
+    register_hccl_collective_backend()
+    register_tensor_transport("HCCL", ["npu"], HCCLTensorTransport, torch.Tensor)

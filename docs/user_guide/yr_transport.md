@@ -215,7 +215,7 @@ import os
 import ray
 from ray.util.collective import create_collective_group
 from ray_ascend import register_yr_tensor_transport
-from ray_ascend.collective import HCCLGroup
+from ray_ascend.collective.hccl_collective_group import HCCLGroup
 
 ray.init(address="auto")
 

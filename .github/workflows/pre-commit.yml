@@ -4,9 +4,6 @@ name: pre-commit
 # No need to avoid / cancel lightweight pre-commit jobs
 on:
   pull_request:
-  push:
-    branches:
-      - master
 
 # Declare permissions just read content.
 permissions:
