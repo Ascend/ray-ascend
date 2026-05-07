@@ -44,20 +44,43 @@ def raise_if_failed(failed_keys, action):
 
 
 class BaseDSAdapter(ABC):
+    MAX_KEYS_PER_BATCH = 10000
+
     @abstractmethod
     def init(self):
         pass
 
-    @abstractmethod
     def put(self, keys, tensors):
-        pass
+        """Store multiple objects with batch processing."""
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            self._put_batch(keys[i : i + batch_size], tensors[i : i + batch_size])
 
     @abstractmethod
+    def _put_batch(self, keys, tensors):
+        """Process a single batch of put operations."""
+        pass
+
     def get(self, keys, tensors):
-        pass
+        """Retrieve multiple objects with batch processing."""
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            self._get_batch(keys[i : i + batch_size], tensors[i : i + batch_size])
 
     @abstractmethod
+    def _get_batch(self, keys, tensors):
+        """Process a single batch of get operations."""
+        pass
+
     def delete(self, keys):
+        """Delete multiple keys with batch processing."""
+        batch_size = self.MAX_KEYS_PER_BATCH
+        for i in range(0, len(keys), batch_size):
+            self._delete_batch(keys[i : i + batch_size])
+
+    @abstractmethod
+    def _delete_batch(self, keys):
+        """Process a single batch of delete operations."""
         pass
 
 
@@ -158,13 +181,8 @@ class CPUClientAdapter(BaseDSAdapter):
             offsets.append((offset, length))
         return [mv[offset : offset + length] for offset, length in offsets]
 
-    def put(self, keys: list[str], tensors: list[torch.Tensor]):
-        """Store multiple objects in zero-copy mode using parallel serialization and buffer packing.
-
-        Args:
-            keys (list[str]): List of string keys under which the objects will be stored.
-            tensors (list[torch.Tensor]): List of tensors to store.
-        """
+    def _put_batch(self, keys: list[str], tensors: list[torch.Tensor]):
+        """Process a single batch of put operations."""
         items_list = [[memoryview(b) for b in _encoder.encode(obj)] for obj in tensors]
         packed_sizes = [self.calc_packed_size(items) for items in items_list]
         buffers = self._client.mcreate(keys, packed_sizes)
@@ -181,21 +199,16 @@ class CPUClientAdapter(BaseDSAdapter):
                 list(executor.map(lambda p: self.pack_into(*p), tasks))
         self._client.mset_buffer(buffers)
 
-    def get(self, keys: list[str], tensors: list[torch.Tensor]):
-        """Retrieve multiple objects in zero-copy mode by directly deserializing from shared memory buffers.
-
-        Args:
-            keys (list[str]): List of string keys to retrieve from storage.
-            tensors (list[torch.Tensor]): Pre-allocated list of tensors to hold the retrieved data. The length of this list should match the number of keys.
-
-        """
+    def _get_batch(self, keys: list[str], tensors: list[torch.Tensor]):
+        """Process a single batch of get operations."""
         buffers = self._client.get_buffers(keys)
         for i, buffer in enumerate(buffers):
             if buffer is None:
                 raise RuntimeError(f"Failed to get key: {keys[i]}")
             tensors[i] = _decoder.decode(self.unpack_from(buffer))
 
-    def delete(self, keys):
+    def _delete_batch(self, keys):
+        """Process a single batch of delete operations."""
         failed_keys = self._client.delete(keys=keys)
         raise_if_failed(failed_keys, "delete")
 
@@ -204,6 +217,7 @@ class CPUClientAdapter(BaseDSAdapter):
 
 
 class NPUClientAdapter(BaseDSAdapter):
+
     def __init__(self, host, port):
         if not NPU_AVAILABLE:
             raise RuntimeError(
@@ -221,14 +235,17 @@ class NPUClientAdapter(BaseDSAdapter):
     def init(self):
         self._client.init()
 
-    def put(self, keys, tensors):
+    def _put_batch(self, keys, tensors):
+        """Process a single batch of put operations."""
         failed_keys = self._client.dev_mset(keys=keys, tensors=tensors)
         raise_if_failed(failed_keys, "put")
 
-    def get(self, keys, tensors):
+    def _get_batch(self, keys, tensors):
+        """Process a single batch of get operations."""
         failed_keys = self._client.dev_mget(keys=keys, tensors=tensors)
         raise_if_failed(failed_keys, "get")
 
-    def delete(self, keys):
+    def _delete_batch(self, keys):
+        """Process a single batch of delete operations."""
         failed_keys = self._client.dev_delete(keys=keys)
         raise_if_failed(failed_keys, "delete")
