@@ -10,22 +10,20 @@ inference weight synchronization.
 
 ### Hardware
 
-| Component | Specification |
-| --------- | ------------- |
-| NPU Model | _e.g., Ascend 910B_ |
-| Node Count | _e.g., 2 nodes_ |
-| Network | _e.g., 100 Gbps RoCE_ |
-| Memory | _e.g., 64 GB_ |
+| Component  | Specification |
+| ---------- | ------------- |
+| NPU Model  | _Ascend 910B_ |
+| Node Count | _2 nodes_     |
+| Network    | \_\_          |
 
 ### Software
 
-| Component | Version |
-| --------- | ------- |
-| CANN | _e.g., 8.0.RC1_ |
-| Ray | _e.g., 2.9.0_ |
-| Python | _e.g., 3.10_ |
-| Ray-Ascend | _e.g., commit hash or version_ |
-
+| Component  | Version   |
+| ---------- | --------- |
+| CANN       | _8.3.RC1_ |
+| Ray        | _2.55.1_  |
+| Python     | _3.10.16_ |
+| Ray-Ascend | _0.1.0_   |
 
 ______________________________________________________________________
 
@@ -33,9 +31,13 @@ ______________________________________________________________________
 
 This benchmark compares the performance of YR Direct Transport (RDT) against Ray's
 default serialization for NPU tensor transmission in post-training RL scenarios.
+
 ### 1.1 Local mode
 
+Colocate Ray actors on the same node:
+
 #### 1.1.1 Base Configuration
+
 ```yaml
 backend: yr
 init_mode: metastore
@@ -44,27 +46,32 @@ device: npu
 warmup_times: 5
 count: 20
 ```
-### 1.2 Results
 
-#### Throughput Comparison
+#### 1.1.2 Results
 
-| Tensor Size | YR RDT (Gb/s) | Ray Serialization (Gb/s) | Speedup |
-| ----------- | ------------- | ------------------------- | ------- |
-| 1 KB        |               |                           |         |
-| 64 KB       |               |                           |         |
-| 1 MB        |               |                           |         |
-| 16 MB       |               |                           |         |
-| 64 MB       |               |                           |         |
+**Throughput Comparison**
 
-#### Latency Comparison (P50 / P99)
+| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | AVG Throughput (Gbps) |
+| :------ | :----------- | :--------------- | :-------------- | :------------- | :-------------------- |
+| small   | 9216         | 32               | 0.28            | yr             | 0.35                  |
+| small   | 9216         | 32               | 0.28            | ray            | 0.19                  |
+| medium  | 61440        | 128              | 7.50            | yr             | 1.25                  |
+| medium  | 61440        | 128              | 7.50            | ray            | 0.42                  |
+| large   | 35000        | 384              | 12.81           | yr             | 4.27                  |
+| large   | 35000        | 384              | 12.81           | ray            | 0.70                  |
 
-| Tensor Size | YR RDT (ms) | Ray Serialization (ms) | Reduction |
-| ----------- | ----------- | ----------------------- | --------- |
-| 1 KB        |             |                         |           |
-| 64 KB       |             |                         |           |
-| 1 MB        |             |                         |           |
-| 16 MB       |             |                         |           |
-| 64 MB       |             |                         |           |
+**Latency Comparison**
+
+| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | P90 Latency (s) | P95 Latency (s) | P99 Latency (s) |
+| :------ | :----------- | :--------------- | :-------------- | :------------- | :-------------- | :-------------- | :-------------- |
+| small   | 9216         | 32               | 0.28            | yr             | 7.10            | 7.30            | 7.33            |
+| small   | 9216         | 32               | 0.28            | ray            | 12.14           | 12.15           | 12.27           |
+| medium  | 61440        | 128              | 7.50            | yr             | 48.99           | 49.09           | 49.17           |
+| medium  | 61440        | 128              | 7.50            | ray            | 144.05          | 144.54          | 152.03          |
+| large   | 35000        | 384              | 12.81           | yr             | 24.38           | 24.46           | 24.76           |
+| large   | 35000        | 384              | 12.81           | ray            | 148.14          | 148.90          | 149.16          |
+
+### 1.2 Remote mode
 
 ### 1.3 Analysis
 
@@ -84,8 +91,8 @@ ______________________________________________________________________
 
 ### 2.1 Test Scenario
 
-**Use Case**: Synchronizing model weights between training and inference instances
-in a training-inference co-located deployment.
+**Use Case**: Synchronizing model weights between training and inference instances in a
+training-inference co-located deployment.
 
 **Data Characteristics**:
 
@@ -111,12 +118,12 @@ ______________________________________________________________________
 ### Key Findings
 
 1. _Summary of RL samples transmission results_
-2. _Summary of weight synchronization results (after testing)_
+1. _Summary of weight synchronization results (after testing)_
 
 ### Recommendations
 
 1. _When to use YR RDT vs Ray serialization_
-2. _Optimal configurations for different scenarios_
+1. _Optimal configurations for different scenarios_
 
 ______________________________________________________________________
 
