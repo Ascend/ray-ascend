@@ -113,6 +113,43 @@ count: 20
 | large   | 35000        | 384              | 12.81           | yr             | 29.98           | 30.14           | 30.18           |
 | large   | 35000        | 384              | 12.81           | ray            | 135.85          | 136.74          | 138.81          |
 
+#### 1.1.1 Base Configuration
+
+```yaml
+backend: yr
+init_mode: metastore
+placement: remote
+head_node_ip: "10.170.27.237"
+worker_node_ip: "10.170.27.158"
+device: npu
+warmup_times: 5
+count: 20
+```
+
+#### 1.1.2 Results
+
+**Throughput Comparison**
+
+| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | AVG Throughput(Gbps) |
+| ------- | ------------ | ---------------- | --------------- | -------------- | -------------------- |
+| small   | 9216         | 32               | 0.28            | yr             | 0.27                 |
+| small   | 9216         | 32               | 0.28            | ray            | 0.19                 |
+| medium  | 61440        | 128              | 7.50            | yr             | 1.11                 |
+| medium  | 61440        | 128              | 7.50            | ray            | 0.47                 |
+| large   | 35000        | 384              | 12.81           | yr             | 3.48                 |
+| large   | 35000        | 384              | 12.81           | ray            | 0.76                 |
+
+**Latency Comparison**
+
+| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | P99 Latency (s) | P95 Latency (s) | P90 Latency (s) |
+| ------- | ------------ | ---------------- | --------------- | -------------- | --------------- | --------------- | --------------- |
+| small   | 9216         | 32               | 0.28            | yr             | 9.25            | 9.02            | 8.76            |
+| small   | 9216         | 32               | 0.28            | ray            | 12.14           | 12.10           | 12.05           |
+| medium  | 61440        | 128              | 7.50            | yr             | 55.22           | 55.15           | 54.97           |
+| medium  | 61440        | 128              | 7.50            | ray            | 129.54          | 129.16          | 128.63          |
+| large   | 35000        | 384              | 12.81           | yr             | 30.18           | 30.14           | 29.98           |
+| large   | 35000        | 384              | 12.81           | ray            | 138.81          | 136.74          | 135.85          |
+
 ### 1.3 Analysis
 
 ![Throughput and Latency Comparison](images/comparison.png)
