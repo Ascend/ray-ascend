@@ -113,7 +113,10 @@ count: 20
 | large   | 35000        | 384              | 12.81           | yr             | 29.98           | 30.14           | 30.18           |
 | large   | 35000        | 384              | 12.81           | ray            | 135.85          | 136.74          | 138.81          |
 
-#### 1.1.1 Base Configuration
+Sender and receiver actors are distributed across two nodes, testing cross-node
+transport performance.
+
+#### 1.2.1 Configuration
 
 ```yaml
 backend: yr
@@ -126,29 +129,29 @@ warmup_times: 5
 count: 20
 ```
 
-#### 1.1.2 Results
+#### 1.2.2 Results
 
 **Throughput Comparison**
 
-| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | AVG Throughput(Gbps) |
-| ------- | ------------ | ---------------- | --------------- | -------------- | -------------------- |
-| small   | 9216         | 32               | 0.28            | yr             | 0.27                 |
-| small   | 9216         | 32               | 0.28            | ray            | 0.19                 |
-| medium  | 61440        | 128              | 7.50            | yr             | 1.11                 |
-| medium  | 61440        | 128              | 7.50            | ray            | 0.47                 |
-| large   | 35000        | 384              | 12.81           | yr             | 3.48                 |
-| large   | 35000        | 384              | 12.81           | ray            | 0.76                 |
+| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | AVG Throughput (Gbps) |
+| ------- | ------------ | ---------------- | --------------- | -------------- | --------------------- |
+| small   | 9216         | 32               | 0.28            | yr             | 0.27                  |
+| small   | 9216         | 32               | 0.28            | ray            | 0.19                  |
+| medium  | 61440        | 128              | 7.50            | yr             | 1.11                  |
+| medium  | 61440        | 128              | 7.50            | ray            | 0.47                  |
+| large   | 35000        | 384              | 12.81           | yr             | 3.48                  |
+| large   | 35000        | 384              | 12.81           | ray            | 0.76                  |
 
 **Latency Comparison**
 
-| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | P99 Latency (s) | P95 Latency (s) | P90 Latency (s) |
+| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | P90 Latency (s) | P95 Latency (s) | P99 Latency (s) |
 | ------- | ------------ | ---------------- | --------------- | -------------- | --------------- | --------------- | --------------- |
-| small   | 9216         | 32               | 0.28            | yr             | 9.25            | 9.02            | 8.76            |
-| small   | 9216         | 32               | 0.28            | ray            | 12.14           | 12.10           | 12.05           |
-| medium  | 61440        | 128              | 7.50            | yr             | 55.22           | 55.15           | 54.97           |
-| medium  | 61440        | 128              | 7.50            | ray            | 129.54          | 129.16          | 128.63          |
-| large   | 35000        | 384              | 12.81           | yr             | 30.18           | 30.14           | 29.98           |
-| large   | 35000        | 384              | 12.81           | ray            | 138.81          | 136.74          | 135.85          |
+| small   | 9216         | 32               | 0.28            | yr             | 8.76            | 9.02            | 9.25            |
+| small   | 9216         | 32               | 0.28            | ray            | 12.05           | 12.10           | 12.14           |
+| medium  | 61440        | 128              | 7.50            | yr             | 54.97           | 55.15           | 55.22           |
+| medium  | 61440        | 128              | 7.50            | ray            | 128.63          | 129.16          | 129.54          |
+| large   | 35000        | 384              | 12.81           | yr             | 29.98           | 30.14           | 30.18           |
+| large   | 35000        | 384              | 12.81           | ray            | 135.85          | 136.74          | 138.81          |
 
 ### 1.3 Analysis
 
