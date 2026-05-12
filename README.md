@@ -26,6 +26,8 @@ collective communication via
 [Ray Direct Transport (RDT)](https://docs.ray.io/en/latest/ray-core/direct-transport.html),
 and more.
 
+For performance benchmarks, see the [Performance Benchmark Report](./docs/developer_guide/performance_benchmark_report.md).
+
 ## Prerequisites
 
 - **Architecture**: aarch64, x86
