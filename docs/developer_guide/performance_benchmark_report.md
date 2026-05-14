@@ -1,6 +1,6 @@
 # Performance Benchmark Report
 
-> Last updated: 2026/05/11
+> _Last updated: 05/14/2026_
 
 This report documents the performance benchmark results for Ray-Ascend's core data
 transport capabilities, focusing on post-training RL sample transmission and training-
@@ -72,46 +72,6 @@ count: 20
 | large   | 35000        | 384              | 12.81           | ray            | 148.14          | 148.90          | 149.16          |
 
 ### 1.2 Remote Mode
-
-Sender and receiver actors are distributed across two nodes, testing cross-node
-transport performance.
-
-#### 1.2.1 Configuration
-
-```yaml
-backend: yr
-init_mode: metastore
-placement: remote
-head_node_ip: "10.170.27.237"
-worker_node_ip: "10.170.27.158"
-device: npu
-warmup_times: 5
-count: 20
-```
-
-#### 1.2.2 Results
-
-**Throughput Comparison**
-
-| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | AVG Throughput (Gbps) |
-| ------- | ------------ | ---------------- | --------------- | -------------- | --------------------- |
-| small   | 9216         | 32               | 0.28            | yr             | 0.27                  |
-| small   | 9216         | 32               | 0.28            | ray            | 0.19                  |
-| medium  | 61440        | 128              | 7.50            | yr             | 1.11                  |
-| medium  | 61440        | 128              | 7.50            | ray            | 0.47                  |
-| large   | 35000        | 384              | 12.81           | yr             | 3.48                  |
-| large   | 35000        | 384              | 12.81           | ray            | 0.76                  |
-
-**Latency Comparison**
-
-| Setting | Tensor Count | Tensor Size (KB) | Total Size (GB) | Transport Mode | P90 Latency (s) | P95 Latency (s) | P99 Latency (s) |
-| ------- | ------------ | ---------------- | --------------- | -------------- | --------------- | --------------- | --------------- |
-| small   | 9216         | 32               | 0.28            | yr             | 8.76            | 9.02            | 9.25            |
-| small   | 9216         | 32               | 0.28            | ray            | 12.05           | 12.10           | 12.14           |
-| medium  | 61440        | 128              | 7.50            | yr             | 54.97           | 55.15           | 55.22           |
-| medium  | 61440        | 128              | 7.50            | ray            | 128.63          | 129.16          | 129.54          |
-| large   | 35000        | 384              | 12.81           | yr             | 29.98           | 30.14           | 30.18           |
-| large   | 35000        | 384              | 12.81           | ray            | 135.85          | 136.74          | 138.81          |
 
 Sender and receiver actors are distributed across two nodes, testing cross-node
 transport performance.

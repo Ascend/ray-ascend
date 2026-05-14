@@ -1,6 +1,6 @@
 # Developer Guide
 
-> _Last updated: 03/09/2026_
+> _Last updated: 05/14/2026_
 
 ## Target
 
@@ -195,6 +195,9 @@ Before submitting, please ensure:
 
 For instructions on running performance benchmarks for YR Direct Transport, see
 [Performance Testing Guide](performance_testing.md).
+
+For actual benchmark results and analysis, see the
+[Performance Benchmark Report](performance_benchmark_report.md).
 
 ## Documentation
 

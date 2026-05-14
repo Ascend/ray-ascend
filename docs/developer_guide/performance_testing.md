@@ -1,9 +1,12 @@
 # Performance Testing
 
-> Last updated: 03/30/2026
+> _Last updated: 05/14/2026_
 
 This guide explains how to run performance tests for ray-ascend, including OpenYuanrong
 (YR) Direct Transport and HCCL collective communication performance tests.
+
+For actual benchmark results and performance analysis, see the
+[Performance Benchmark Report](performance_benchmark_report.md).
 
 ## Overview
 
