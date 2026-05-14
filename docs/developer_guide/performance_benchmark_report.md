@@ -1,6 +1,6 @@
 # Performance Benchmark Report
 
-> Last updated: 2026/05/11
+> _Last updated: 05/14/2026_
 
 This report documents the performance benchmark results for Ray-Ascend's core data
 transport capabilities, focusing on post-training RL sample transmission and training-

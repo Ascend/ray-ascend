@@ -19,6 +19,7 @@ nav:
       - Setup: developer_guide/setup.md
       - Contributing: developer_guide/contributing.md
       - Performance Testing: developer_guide/performance_testing.md
+      - Performance Benchmark Report: developer_guide/performance_benchmark_report.md
 theme:
   name: material
   language: en
