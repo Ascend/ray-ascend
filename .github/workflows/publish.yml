@@ -4,12 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (without v prefix, e.g. 0.1.0)'
-        required: true
-        type: string
 
 jobs:
   build-package:
@@ -32,13 +26,8 @@ jobs:
 
       - name: Update version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Using manual version: ${{ inputs.version }}"
-            python${{ matrix.python-version }} ci/update_version.py ${{ inputs.version }}
-          else
-            echo "Using tag version: ${GITHUB_REF#refs/tags/v}"
-            python${{ matrix.python-version }} ci/update_version.py
-          fi
+          echo "Using tag version: ${GITHUB_REF#refs/tags/v}"
+          python${{ matrix.python-version }} ci/update_version.py
 
       - name: Build package for Python ${{ matrix.python-version }}
         run: |
@@ -68,10 +57,12 @@ jobs:
         with:
           pattern: python-packages-*
           path: dist/
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
+          tag_name: ${{ github.ref_name }}
           files: dist/*.whl
           generate_release_notes: true
         env:
@@ -89,6 +80,7 @@ jobs:
         with:
           pattern: python-packages-*
           path: dist/
+          merge-multiple: true
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

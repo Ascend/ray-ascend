@@ -32,18 +32,18 @@ version = {attr = "ray_ascend.__version__"}
 
 [project.optional-dependencies]
 test = [
-    "torch==2.7.1+cpu; platform_machine == 'x86_64'",
-    "torch==2.7.1; platform_machine == 'aarch64'",
-    "torch-npu==2.7.1.post2",
+    "torch>=2.7.1; platform_machine == 'x86_64'",
+    "torch>=2.7.1; platform_machine == 'aarch64'",
+    "torch-npu>=2.7.1.post2",
     "pytest>=7.0.0",
     "pytest-cov",
 ]
 
 yr = [
     "openyuanrong-datasystem>=0.8.0",
-    "torch==2.7.1+cpu; platform_machine == 'x86_64'",
-    "torch==2.7.1; platform_machine == 'aarch64'",
-    "torch-npu==2.7.1.post2",
+    "torch>=2.7.1; platform_machine == 'x86_64'",
+    "torch>=2.7.1; platform_machine == 'aarch64'",
+    "torch-npu>=2.7.1.post2",
     "requests",
 ]
 

@@ -34,8 +34,8 @@ For performance benchmarks, see the [Performance Benchmark Report](./docs/develo
 - **OS Kernel**: Linux
 - **Python Dependencies**:
   - python >= 3.10, <= 3.11
-  - CANN == 8.2.rc1
-  - torch == 2.7.1, torch-npu == 2.7.1.post1
+  - CANN >= 8.2.rc1
+  - torch >= 2.7.1; torch-npu >= 2.7.1.post2
   - Ray (same version as ray-ascend)
 
 ## Version
