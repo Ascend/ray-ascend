@@ -28,7 +28,7 @@ class YRCommunicatorMetadata(CommunicatorMetadata):
 
 @dataclass
 class YRTransportMetadata(TensorTransportMetadata):
-    """Metadata for tensors stored in the GPU object store for YR transport.
+    """Metadata for tensors stored in the CPU/NPU object store for YR transport.
     Args:
         ds_serialized_keys: Serialized tensor keys for YR transport.
     """
@@ -158,9 +158,9 @@ class YRTensorTransport(TensorTransportManager):
 
         tensor_meta = []
         if not gpu_object:
-            raise ValueError("GPU object list is empty.")
+            raise ValueError("Tensor object list is empty.")
         serialized_keys = self.get_ds_metadata(gpu_object)
-        # We assume all tensors in one GPU object have the same device type.
+        # We assume all tensors in one NPU/CPUobject have the same device type.
         device = gpu_object[0].device
         for t in gpu_object:
             if t.device.type != device.type:
