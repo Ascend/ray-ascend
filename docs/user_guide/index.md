@@ -26,6 +26,8 @@ Optional dependencies for specific features:
 
 - **CANN >= 8.2.rc1**: Required for NPU features (HCCL, NPU tensor transport)
 - **torch >= 2.7.1; torch-npu >= 2.7.1.post2**: Required for PyTorch NPU support
+- **torch and torch-npu version compatibility**: Use matching torch and torch-npu
+  versions.
 
 ## Quick Start
 

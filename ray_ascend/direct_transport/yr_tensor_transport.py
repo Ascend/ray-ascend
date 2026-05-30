@@ -160,7 +160,7 @@ class YRTensorTransport(TensorTransportManager):
         if not gpu_object:
             raise ValueError("Tensor object list is empty.")
         serialized_keys = self.get_ds_metadata(gpu_object)
-        # We assume all tensors in one NPU/CPUobject have the same device type.
+        # We assume all tensors in one NPU/CPU object have the same device type.
         device = gpu_object[0].device
         for t in gpu_object:
             if t.device.type != device.type:

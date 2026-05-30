@@ -36,7 +36,8 @@ For performance benchmarks, see the [Performance Benchmark Report](./docs/develo
   - python >= 3.10, <= 3.11
   - CANN >= 8.2.rc1
   - torch >= 2.7.1; torch-npu >= 2.7.1.post2
-  - Ray (same version as ray-ascend)
+  - torch and torch-npu versions must be compatible with each other.
+  - ray >= 2.55.0
 
 ## Version
 
