@@ -13,6 +13,7 @@ __all__ = [
     "register_yr_tensor_transport",
     "register_hccl_collective_backend",
     "register_hccl_tensor_transport",
+    "register_hixl_tensor_transport",
 ]
 
 __commit__ = _version.commit
@@ -183,3 +184,76 @@ def register_hccl_tensor_transport() -> None:
         return
 
     register_tensor_transport("HCCL", ["npu"], HCCLTensorTransport, torch.Tensor)
+
+
+def register_hixl_tensor_transport(devices: List[str] = ["npu", "cpu"]) -> None:
+    """Register HIXL tensor transport for Ray RDT on Ascend NPU.
+
+    This function should be called in the driver process to register the
+    HIXL transport backend. It must also be called in each Ray actor's
+    __init__ to register the transport for that actor process.
+
+    HIXL uses RDMA READ for zero-copy tensor transfer between Ascend NPU
+    nodes. Unlike YR (which uses a DataSystem intermediary), HIXL is a
+    true one-sided RDMA transport where the receiver directly reads the
+    sender's memory.
+
+    Requirements:
+        - HIXL wheel installed: pip install hixl
+        - CANN driver and runtime installed on all NPU nodes
+        - RDMA/HCCS links established between nodes
+
+    Args:
+        devices: List of device types to support. Can be:
+            - ["npu"] for NPU tensors only
+            - ["npu", "cpu"] for NPU and CPU tensors
+            - ["cpu"] for CPU tensors only
+
+    Example:
+        import ray
+        from ray_ascend import register_hixl_tensor_transport
+
+        ray.init()
+        register_hixl_tensor_transport(["npu", "cpu"])
+
+        @ray.remote(resources={"NPU": 1})
+        class RayActor:
+            def __init__(self):
+                register_hixl_tensor_transport(["npu", "cpu"])
+
+            @ray.method(tensor_transport="HIXL")
+            def transfer_npu_tensor_via_rdma(self):
+                return torch.zeros(1024, device="npu")
+    """
+    if devices is None:
+        raise ValueError(
+            "devices cannot be None. Specify a list of device types, "
+            "e.g., ['npu', 'cpu']"
+        )
+
+    import torch
+
+    try:
+        from ray.experimental import register_tensor_transport
+
+        from ray_ascend.direct_transport.hixl_tensor_transport import (
+            HixlTensorTransport,
+        )
+    except ImportError as e:
+        raise ImportError(
+            "HIXL tensor transport requires the hixl package. "
+            "Please install it with: "
+            "pip install hixl"
+        ) from e
+
+    # Verify hixl is importable before registration.
+    try:
+        import hixl
+    except ImportError as e:
+        raise ImportError(
+            "hixl module not found. HIXL tensor transport requires "
+            "the hixl wheel. Please install: "
+            "pip install hixl"
+        ) from e
+
+    register_tensor_transport("HIXL", devices, HixlTensorTransport, torch.Tensor)
