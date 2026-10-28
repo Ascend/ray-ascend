@@ -5,7 +5,7 @@
 </p>
 
 <h3 align="center">
-Ray Ascend Plugin
+Ray Huawei Ascend Plugin
 </h3>
 
 <p align="center">
